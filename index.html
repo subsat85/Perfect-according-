@@ -130,7 +130,7 @@ dl.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0}dl.kv dt
 </div>
 <nav class="bnav">
   <a href="#/home" data-r="home"><span class="ic">◧</span>الرئيسية</a>
-  <a href="#/txns" data-r="txns"><span class="ic">☰</span>العمليات</a>
+  <a href="#/txns" data-r="txns"><span class="ic">☰</span>القيود</a>
   <a href="#/new" class="fab" data-r="new">＋</a>
   <a href="#/reports" data-r="reports"><span class="ic">▤</span>التقارير</a>
   <button data-act="more"><span class="ic">⋯</span>المزيد</button>
@@ -158,9 +158,9 @@ dl.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0}dl.kv dt
     sales: '4100', otherInc: '4300', cogs: '5100', invDiff: '5200', salaries: '6000',
   };
   const ACC_NAMES = {
-    '1110': 'الصندوق (كاش)', '1120': 'البنك / الفيزا', '1300': 'سلف الموظفين', '1400': 'المخزون', '1500': 'مصاريف موزّعة (مدفوعة مقدماً)',
-    '2100': 'ذمم التجار', '2200': 'فواتير مستحقة غير مدفوعة', '3100': 'رأس المال', '3200': 'المسحوبات الشخصية', '3300': 'أرصدة افتتاحية',
-    '4100': 'المبيعات', '4300': 'إيرادات أخرى', '5100': 'تكلفة البضاعة المباعة', '5200': 'فروقات الجرد', '6000': 'رواتب الموظفين',
+    '1110': 'الصندوق', '1120': 'البنك', '1300': 'ذمم الموظفين (سلف)', '1400': 'المخزون', '1500': 'مصروفات مدفوعة مقدماً',
+    '2100': 'الذمم الدائنة (الموردون)', '2200': 'مصروفات مستحقة', '3100': 'رأس المال', '3200': 'مسحوبات المالك', '3300': 'أرصدة افتتاحية',
+    '4100': 'المبيعات', '4300': 'إيرادات أخرى', '5100': 'تكلفة البضاعة المباعة', '5200': 'عجز وزيادة المخزون', '6000': 'الرواتب والأجور',
   };
   const ACC_TYPE = (code) => {
     const c = String(code)[0];
@@ -176,13 +176,13 @@ dl.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0}dl.kv dt
 
   /* ---------- أنواع العمليات ---------- */
   const TYPES = {
-    sale: 'مبيعات', purchase: 'فاتورة شراء', preturn: 'مرتجع مشتريات', transfer: 'نقل بضاعة', count: 'جرد / تسوية مخزون',
-    ostock: 'مخزون افتتاحي', expense: 'مصروف / فاتورة', billpay: 'تسديد فاتورة', spay: 'دفعة لتاجر', income: 'إيراد آخر',
-    capital: 'إضافة رأس مال', drawing: 'مسحوبات شخصية', money: 'تحويل كاش ↔ بنك', opening: 'أرصدة افتتاحية',
-    advance: 'سلفة موظف', advpay: 'سداد سلفة نقداً', payroll: 'راتب موظف',
+    sale: 'فاتورة مبيعات', purchase: 'فاتورة شراء', preturn: 'مردودات مشتريات', transfer: 'تحويل مخزني', count: 'جرد وتسوية مخزون',
+    ostock: 'مخزون أول المدة', expense: 'قيد مصروف', billpay: 'سداد مصروف مستحق', spay: 'سند صرف لمورد', income: 'إيرادات أخرى',
+    capital: 'زيادة رأس المال', drawing: 'مسحوبات المالك', money: 'تحويل نقدية بين الصندوق والبنك', opening: 'أرصدة افتتاحية',
+    advance: 'سلفة موظف', advpay: 'استرداد سلفة نقداً', payroll: 'قيد راتب',
   };
   const ORDER = { opening: 0, ostock: 1, capital: 2, purchase: 3, preturn: 4, transfer: 5, sale: 6, count: 7, expense: 8, billpay: 9, spay: 10, income: 11, drawing: 12, money: 13, advance: 14, advpay: 15, payroll: 16 };
-  const PAY_NAMES = { cash: 'كاش', bank: 'بنك / فيزا', credit: 'آجل (ذمة)', unpaid: 'غير مدفوعة' };
+  const PAY_NAMES = { cash: 'نقداً', bank: 'البنك / البطاقة', credit: 'آجل (على الحساب)', unpaid: 'مستحق (غير مسدد)' };
 
   /* ---------- مجاميع ---------- */
   const saleLineNet = (l) => r3(num(l.qty) * num(l.price) - num(l.disc));
@@ -218,42 +218,42 @@ dl.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0}dl.kv dt
     const e = [], cfg = st.cfg || {};
     const items = new Set((st.items || []).map((i) => i.id));
     const locs = new Set((cfg.locations || []).map((l) => l.id));
-    if (!TYPES[t.type]) e.push('نوع عملية غير معروف');
+    if (!TYPES[t.type]) e.push('نوع قيد غير معروف');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(t.date || '')) e.push('التاريخ مطلوب');
     if (cfg.startDate && t.date < cfg.startDate) e.push('التاريخ قبل تاريخ بدء النظام (' + cfg.startDate + ')');
     if (cfg.lockDate && t.date <= cfg.lockDate) e.push('الفترة مقفلة حتى ' + cfg.lockDate);
     const needLines = ['sale', 'purchase', 'preturn', 'transfer', 'count', 'ostock'];
     if (needLines.includes(t.type)) {
-      if (!(t.lines || []).length) e.push('لازم سطر واحد عالأقل');
+      if (!(t.lines || []).length) e.push('يجب إدخال سطر واحد على الأقل');
       (t.lines || []).forEach((l, i) => {
         const n = 'السطر ' + (i + 1) + ': ';
-        if (!items.has(l.itemId)) e.push(n + 'اختار الصنف');
+        if (!items.has(l.itemId)) e.push(n + 'اختر الصنف');
         if (t.type === 'count') { if (l.counted === '' || l.counted == null || num(l.counted) < 0) e.push(n + 'الكمية المعدودة مطلوبة'); }
-        else if (t.type === 'sale') { if (!num(l.qty)) e.push(n + 'الكمية مطلوبة'); if (num(l.price) < 0) e.push(n + 'السعر سالب'); if (!locs.has(l.locId)) e.push(n + 'اختار الموقع'); }
-        else { if (!(num(l.qty) > 0)) e.push(n + 'الكمية لازم تكون أكبر من صفر'); }
+        else if (t.type === 'sale') { if (!num(l.qty)) e.push(n + 'الكمية مطلوبة'); if (num(l.price) < 0) e.push(n + 'السعر سالب'); if (!locs.has(l.locId)) e.push(n + 'اختر الموقع'); }
+        else { if (!(num(l.qty) > 0)) e.push(n + 'الكمية يجب أن تكون أكبر من صفر'); }
         if (['purchase', 'preturn', 'ostock'].includes(t.type) && num(l.cost) < 0) e.push(n + 'التكلفة سالبة');
       });
     }
-    if (['purchase', 'preturn', 'ostock', 'count'].includes(t.type) && !locs.has(t.locId)) e.push('اختار الموقع');
-    if (t.type === 'transfer') { if (!locs.has(t.from) || !locs.has(t.to)) e.push('اختار من وين ولوين'); else if (t.from === t.to) e.push('الموقعين لازم يكونوا مختلفين'); }
-    if (['purchase', 'preturn', 'spay'].includes(t.type) && !(st.suppliers || []).some((s) => s.id === t.supplierId)) e.push('اختار التاجر');
+    if (['purchase', 'preturn', 'ostock', 'count'].includes(t.type) && !locs.has(t.locId)) e.push('اختر الموقع');
+    if (t.type === 'transfer') { if (!locs.has(t.from) || !locs.has(t.to)) e.push('اختر موقع المصدر والوجهة'); else if (t.from === t.to) e.push('الموقعين يجب أن يكونوا مختلفين'); }
+    if (['purchase', 'preturn', 'spay'].includes(t.type) && !(st.suppliers || []).some((s) => s.id === t.supplierId)) e.push('اختر المورد');
     if (t.type === 'purchase') {
       if (!['cash', 'bank', 'credit'].includes(t.pay)) e.push('طريقة الدفع');
-      if (t.pay !== 'credit' && (num(t.paid) < 0 || r3(t.paid) > total(t))) e.push('المدفوع لازم يكون بين صفر والإجمالي');
+      if (t.pay !== 'credit' && (num(t.paid) < 0 || r3(t.paid) > total(t))) e.push('المدفوع يجب أن يكون بين صفر والإجمالي');
     }
     if (t.type === 'sale') {
       const tot = total(t), p = r3(num(t.cash) + num(t.bank));
-      if (Math.abs(p - tot) > 0.0005) e.push('مجموع الكاش والفيزا (' + p + ') لازم يساوي إجمالي البيع (' + tot + ')');
+      if (Math.abs(p - tot) > 0.0005) e.push('مجموع الصندوق والبطاقة (' + p + ') يجب أن يساوي إجمالي البيع (' + tot + ')');
     }
-    if (['expense', 'billpay', 'spay', 'income', 'capital', 'drawing', 'money', 'advance', 'advpay'].includes(t.type) && !(num(t.amount) > 0)) e.push('المبلغ لازم يكون أكبر من صفر');
+    if (['expense', 'billpay', 'spay', 'income', 'capital', 'drawing', 'money', 'advance', 'advpay'].includes(t.type) && !(num(t.amount) > 0)) e.push('المبلغ يجب أن يكون أكبر من صفر');
     if (t.type === 'expense') {
-      if (!(cfg.expCats || []).some((c) => c.id === t.catId)) e.push('اختار بند المصروف');
+      if (!(cfg.expCats || []).some((c) => c.id === t.catId)) e.push('اختر بند المصروف');
       if (!['cash', 'bank', 'unpaid'].includes(t.pay)) e.push('طريقة الدفع');
       if (t.spread) { if (!t.spread.from || !t.spread.to || t.spread.from > t.spread.to) e.push('فترة توزيع المصروف غير صحيحة'); }
     }
-    if (['billpay', 'spay', 'income', 'capital', 'drawing', 'advance', 'advpay', 'payroll'].includes(t.type) && !['cash', 'bank'].includes(t.pay)) e.push('ادفع من الكاش أو البنك');
-    if (t.type === 'money' && (!['cash', 'bank'].includes(t.from) || !['cash', 'bank'].includes(t.to) || t.from === t.to)) e.push('اختار التحويل');
-    if (['advance', 'advpay', 'payroll'].includes(t.type) && !(st.employees || []).some((x) => x.id === t.empId)) e.push('اختار الموظف');
+    if (['billpay', 'spay', 'income', 'capital', 'drawing', 'advance', 'advpay', 'payroll'].includes(t.type) && !['cash', 'bank'].includes(t.pay)) e.push('اختر السداد من الصندوق أو البنك');
+    if (t.type === 'money' && (!['cash', 'bank'].includes(t.from) || !['cash', 'bank'].includes(t.to) || t.from === t.to)) e.push('اختر التحويل');
+    if (['advance', 'advpay', 'payroll'].includes(t.type) && !(st.employees || []).some((x) => x.id === t.empId)) e.push('اختر الموظف');
     if (t.type === 'advance' && t.mode === 'inst' && !(num(t.count) >= 1)) e.push('عدد الأقساط');
     if (t.type === 'payroll') {
       if (!/^\d{4}-\d{2}$/.test(t.month || '')) e.push('شهر الراتب');
@@ -261,7 +261,7 @@ dl.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0}dl.kv dt
     }
     if (t.type === 'billpay') {
       const ex = (st.txns || []).find((x) => x.id === t.expenseId && x.status === 'posted');
-      if (!ex) e.push('اختار الفاتورة');
+      if (!ex) e.push('اختر الفاتورة');
     }
     return e;
   }
@@ -306,10 +306,10 @@ dl.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0}dl.kv dt
       const cr = (acc, a, party, memo) => dr(acc, -a, party, memo);
       const tot = total(t);
       switch (t.type) {
-        case 'opening': dr(ACC.cash, t.cash, '', 'رصيد كاش افتتاحي'); dr(ACC.bank, t.bank, '', 'رصيد بنك افتتاحي'); cr(ACC.opening, tot); break;
+        case 'opening': dr(ACC.cash, t.cash, '', 'رصيد الصندوق الافتتاحي'); dr(ACC.bank, t.bank, '', 'رصيد البنك الافتتاحي'); cr(ACC.opening, tot); break;
         case 'ostock': {
           (t.lines || []).forEach((l) => { const v = r3(num(l.qty) * num(l.cost)); if (num(l.cost)) s(l.itemId).last = num(l.cost); mv(t, l.itemId, t.locId, num(l.qty), v, 'opening'); });
-          dr(ACC.inv, tot, '', 'مخزون افتتاحي'); cr(ACC.opening, tot); break;
+          dr(ACC.inv, tot, '', 'مخزون أول المدة'); cr(ACC.opening, tot); break;
         }
         case 'purchase': {
           const base = (t.lines || []).reduce((a, l) => a + num(l.qty) * num(l.cost), 0), ex = num(t.extras); let alloc = 0;
@@ -322,14 +322,14 @@ dl.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0}dl.kv dt
           });
           dr(ACC.inv, tot, t.supplierId, 'شراء بضاعة');
           const paid = t.pay === 'credit' ? 0 : (t.paid === '' || t.paid == null ? tot : r3(t.paid));
-          if (paid) cr(PAY_ACC[t.pay], paid, '', 'مدفوع للتاجر');
-          if (r3(tot - paid)) cr(ACC.ap, tot - paid, t.supplierId, 'ذمة للتاجر');
+          if (paid) cr(PAY_ACC[t.pay], paid, '', 'مسدد للمورد');
+          if (r3(tot - paid)) cr(ACC.ap, tot - paid, t.supplierId, 'ذمة دائنة للمورد');
           break;
         }
         case 'preturn': {
           (t.lines || []).forEach((l) => { mv(t, l.itemId, t.locId, -num(l.qty), -r3(num(l.qty) * num(l.cost)), 'preturn'); purchLines.push({ id: t.id, date: t.date, ref: t.ref || '', supplierId: t.supplierId, locId: t.locId, itemId: l.itemId, qty: -num(l.qty), cost: num(l.cost), value: -r3(num(l.qty) * num(l.cost)) }); });
-          if (t.pay === 'cash' || t.pay === 'bank') dr(PAY_ACC[t.pay], tot, '', 'مسترد من التاجر'); else dr(ACC.ap, tot, t.supplierId, 'تخفيض ذمة التاجر');
-          cr(ACC.inv, tot, t.supplierId, 'مرتجع مشتريات'); break;
+          if (t.pay === 'cash' || t.pay === 'bank') dr(PAY_ACC[t.pay], tot, '', 'مسترد من المورد'); else dr(ACC.ap, tot, t.supplierId, 'تخفيض ذمة المورد');
+          cr(ACC.inv, tot, t.supplierId, 'مردودات مشتريات'); break;
         }
         case 'transfer': (t.lines || []).forEach((l) => { const c = r3(num(l.qty) * avg(l.itemId)); mv(t, l.itemId, t.from, -num(l.qty), -c, 'out'); mv(t, l.itemId, t.to, num(l.qty), c, 'in'); }); break;
         case 'count': {
@@ -342,11 +342,11 @@ dl.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0}dl.kv dt
           val = r3(val); dr(ACC.inv, val, '', 'فرق جرد'); cr(ACC.invDiff, val, '', 'فرق جرد'); break;
         }
         case 'sale': {
-          if (num(t.cash)) dr(ACC.cash, t.cash, '', 'مقبوض كاش');
-          if (num(t.bank)) dr(ACC.bank, t.bank, '', 'مقبوض فيزا / بنك');
+          if (num(t.cash)) dr(ACC.cash, t.cash, '', 'المقبوض نقداً');
+          if (num(t.bank)) dr(ACC.bank, t.bank, '', 'المقبوض بالبطاقة / البنك');
           cr(ACC.sales, tot); let cogs = 0;
           (t.lines || []).forEach((l) => {
-            const a = avg(l.itemId); if (!(a > 0)) warnings.push({ id: t.id, date: t.date, msg: 'ما في تكلفة معروفة للصنف ' + iname(l.itemId) + ' — الربح رح يطلع بدون تكلفة' });
+            const a = avg(l.itemId); if (!(a > 0)) warnings.push({ id: t.id, date: t.date, msg: 'لا يوجد تكلفة معروفة للصنف ' + iname(l.itemId) + ' — سيُحتسب الربح دون تكلفة' });
             const c = r3(num(l.qty) * a); mv(t, l.itemId, l.locId, -num(l.qty), -c, 'sale'); cogs += c;
             const net = saleLineNet(l);
             saleLines.push({ id: t.id, date: t.date, inv: l.inv || t.ref || '', itemId: l.itemId, locId: l.locId, qty: num(l.qty), price: num(l.price), disc: num(l.disc), net, cost: c, profit: r3(net - c) });
@@ -365,8 +365,8 @@ dl.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0}dl.kv dt
           } else { dr(expAcc(t.catId), tot, '', t.desc); cr(pa, tot, t.pay === 'unpaid' ? t.id : ''); }
           break;
         }
-        case 'billpay': dr(ACC.accrued, tot, t.expenseId, 'تسديد فاتورة'); cr(PAY_ACC[t.pay], tot); break;
-        case 'spay': dr(ACC.ap, tot, t.supplierId, 'دفعة للتاجر'); cr(PAY_ACC[t.pay], tot); break;
+        case 'billpay': dr(ACC.accrued, tot, t.expenseId, 'سداد مصروف مستحق'); cr(PAY_ACC[t.pay], tot); break;
+        case 'spay': dr(ACC.ap, tot, t.supplierId, 'سند صرف لمورد'); cr(PAY_ACC[t.pay], tot); break;
         case 'income': dr(PAY_ACC[t.pay], tot); cr(ACC.otherInc, tot, '', t.desc); break;
         case 'capital': dr(PAY_ACC[t.pay], tot); cr(ACC.capital, tot); break;
         case 'drawing': dr(ACC.drawings, tot); cr(PAY_ACC[t.pay], tot); break;
@@ -560,9 +560,9 @@ const writeQ = {};
 function queued(path, fn) { const p = (writeQ[path] || Promise.resolve()).then(fn, fn); writeQ[path] = p.catch(() => {}); return p; }
 async function dbErr(e) {
   const c = e && e.code;
-  if (c === 'quota_exceeded') toast('المساحة امتلأت — ما انحفظ. صدّر نسخة احتياطية واحذف بيانات قديمة.', 'err', 8000);
-  else if (c === 'invalid_argument') toast('ما انحفظ: ما عندك صلاحية كتابة أو البيانات كبيرة.', 'err', 6000);
-  else toast('ما انحفظ (' + (c || 'خطأ') + ') — جرّب مرة ثانية.', 'err', 6000);
+  if (c === 'quota_exceeded') toast('المساحة امتلأت — لم يتم الحفظ. صدّر نسخة احتياطية واحذف بيانات قديمة.', 'err', 8000);
+  else if (c === 'invalid_argument') toast('لم يتم الحفظ: ما عندك صلاحية كتابة أو البيانات كبيرة.', 'err', 6000);
+  else toast('لم يتم الحفظ (' + (c || 'خطأ') + ') — جرّب مرة ثانية.', 'err', 6000);
   throw e;
 }
 function strip(o) { const x = clone(o); delete x.id; return x; }
@@ -606,8 +606,8 @@ function recompute() {
 
 /* ---- التنقل ---- */
 const NAV = [
-  ['home', '◧', 'الرئيسية'], ['new', '＋', 'عملية جديدة'], ['txns', '☰', 'العمليات'], ['stock', '▦', 'المخزون والأصناف'],
-  ['suppliers', '⇄', 'التجار'], ['staff', '☺', 'الموظفين والرواتب'], ['expenses', '◔', 'المصاريف والفواتير'],
+  ['home', '◧', 'الرئيسية'], ['new', '＋', 'قيد جديد'], ['txns', '☰', 'سجل القيود'], ['stock', '▦', 'المخزون والأصناف'],
+  ['suppliers', '⇄', 'الموردون'], ['staff', '☺', 'الموظفون والرواتب'], ['expenses', '◔', 'المصروفات والفواتير'],
   ['reports', '▤', 'التقارير'], ['settings', '⚙', 'الإعدادات'],
 ];
 const PAGES = {};
@@ -615,7 +615,7 @@ function go(r) { location.hash = '#/' + r; }
 function renderNav() {
   const r = A.route;
   $('#nav').innerHTML = NAV.map((n) => '<a href="#/' + n[0] + '" class="' + (r === n[0] ? 'on' : '') + '"><span>' + n[1] + '</span>' + n[2] + '</a>').join('');
-  $('#sideFoot').textContent = (A.st.cfg && A.st.cfg.shopName ? A.st.cfg.shopName + ' · ' : '') + A.st.txns.filter((t) => t.status === 'posted').length + ' عملية مرحّلة' + (A.local && window.Sync && Sync.enabled() ? ' · ' + Sync.status() : '');
+  $('#sideFoot').textContent = (A.st.cfg && A.st.cfg.shopName ? A.st.cfg.shopName + ' · ' : '') + A.st.txns.filter((t) => t.status === 'posted').length + ' قيد مرحّل' + (A.local && window.Sync && Sync.enabled() ? ' · ' + Sync.status() : '');
   $$('.bnav [data-r]').forEach((a) => a.classList.toggle('on', a.dataset.r === r));
 }
 function render() {
@@ -642,14 +642,14 @@ A.actions.more = () => {
 };
 
 /* ---- الإعداد الأول ---- */
-const DEFAULT_CATS = ['كهرباء', 'مياه', 'إنترنت واتصالات', 'إيجار', 'صيانة', 'مواصلات وشحن', 'ضيافة ونظافة', 'تسويق وإعلانات', 'رسوم ورخص حكومية', 'عمولات بنكية', 'مصاريف متفرقة'];
+const DEFAULT_CATS = ['كهرباء', 'مياه', 'إنترنت واتصالات', 'إيجار', 'صيانة', 'مواصلات وشحن', 'ضيافة ونظافة', 'تسويق وإعلانات', 'رسوم ورخص حكومية', 'عمولات بنكية', 'مصروفات متفرقة'];
 function renderSetup() {
   $('#title').textContent = 'تجهيز النظام';
   $('#view').innerHTML = '<div class="card" style="max-width:640px"><h3>أهلاً — خلينا نجهز النظام</h3>' +
     '<div class="fg"><div class="f"><label>اسم المحل</label><input id="suName" value="PERFECT"></div>' +
-    '<div class="f"><label>تاريخ بدء النظام</label><input type="date" id="suStart" value="' + today().slice(0, 8) + '01"><span class="h">العمليات قبله ممنوعة. الأرصدة القديمة بتدخل كأرصدة افتتاحية بهاد التاريخ.</span></div>' +
+    '<div class="f"><label>تاريخ بدء النظام</label><input type="date" id="suStart" value="' + today().slice(0, 8) + '01"><span class="h">لا يُسمح بقيود قبله. تُسجّل الأرصدة السابقة كأرصدة افتتاحية بهذا التاريخ.</span></div>' +
     '<div class="f"><label>نسبة الضريبة المشمولة بالأسعار %</label><input id="suTax" type="number" value="16"></div></div>' +
-    '<p class="mut">المواقع: طابق بدلة، طابق كاجوال، المستودع، مستودع الرمثا. بتقدر تضيف غيرهم من الإعدادات.</p>' +
+    '<p class="mut">المواقع: طابق بدلة، طابق كاجوال، المستودع، مستودع الرمثا. يمكن إضافة مواقع أخرى من الإعدادات.</p>' +
     '<div class="row end"><button class="btn p" id="suGo">ابدأ</button></div></div>';
   $('#suGo').onclick = async () => {
     const cfg = {
@@ -665,7 +665,7 @@ function renderSetup() {
 /* ---- تشغيل ---- */
 async function boot() {
   A.route = (location.hash.replace(/^#\/?/, '') || 'home').split('?')[0];
-  $('#view').innerHTML = '<div class="card empty">عم يحمّل…</div>';
+  $('#view').innerHTML = '<div class="card empty">جارٍ التحميل…</div>';
   let db = null, dl = null;
   try { if (window.claude && window.claude.use) { [db, dl] = await Promise.all([window.claude.use('db'), window.claude.use('downloads')]); } } catch (e) { db = null; }
   if (!db) {
@@ -686,7 +686,7 @@ async function saveFile(filename, data) {
     } catch (e) { toast('ما زبط التنزيل', 'err'); return false; }
   }
   try { await A.dl.save({ filename, data }); toast('تم التنزيل', 'ok'); return true; }
-  catch (e) { const c = e && e.code; if (c === 'declined') return false; toast(c === 'rate_limited' ? 'في نافذة تنزيل مفتوحة — استنى شوي' : 'ما زبط التنزيل (' + c + ')', 'err'); return false; }
+  catch (e) { const c = e && e.code; if (c === 'declined') return false; toast(c === 'rate_limited' ? 'توجد نافذة تنزيل مفتوحة — يُرجى الانتظار' : 'ما زبط التنزيل (' + c + ')', 'err'); return false; }
 }
 /* ===== التخزين المحلي (لما التطبيق يشتغل برا Claude، مثل GitHub Pages) =====
  * IndexedDB بنفس واجهة db: doc / collection / get / set / delete / onSnapshot
@@ -746,7 +746,7 @@ const Sync = (window.Sync = {
     if (!Sync.enabled()) return '';
     if (Sync.err) return '⚠ ' + Sync.err;
     const m = Sync.meta(); const dirty = m.localStamp !== Sync.localStamp();
-    return (Sync.busy ? '⟳ عم يزامن…' : dirty ? '● في تغييرات ما انرفعت' : '✔ متزامن مع GitHub') + (m.at ? ' · ' + new Date(m.at).toLocaleString('en-GB') : '');
+    return (Sync.busy ? '⟳ جارٍ المزامنة…' : dirty ? '● توجد تعديلات لم تُرفع' : '✔ متزامن مع GitHub') + (m.at ? ' · ' + new Date(m.at).toLocaleString('en-GB') : '');
   },
   url() { const c = Sync.cfg(); return 'https://api.github.com/repos/' + c.repo.trim() + '/contents/' + (c.path || 'perfect-data.json') + '?ref=' + encodeURIComponent(c.branch || 'main'); },
   headers(raw) { return { Authorization: 'Bearer ' + Sync.cfg().token.trim(), Accept: raw ? 'application/vnd.github.raw+json' : 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }; },
@@ -762,7 +762,7 @@ const Sync = (window.Sync = {
     if (!Sync.enabled() || Sync.busy) return; Sync.busy = true; Sync.err = null; Sync.paint();
     try {
       const meta = await Sync.remoteMeta(); const m = Sync.meta();
-      if (meta && m.sha && meta.sha !== m.sha && !force) throw new Error('النسخة على GitHub تغيّرت من جهاز ثاني — من الإعدادات اختار «تحميل» أو «رفع بالقوة»');
+      if (meta && m.sha && meta.sha !== m.sha && !force) throw new Error('النسخة على GitHub تغيّرت من جهاز ثاني — من الإعدادات اختر «تحميل» أو «رفع بالقوة»');
       const stamp = Sync.localStamp();
       const body = { message: 'PERFECT ' + nowIso(), content: Sync.b64(JSON.stringify({ app: 'perfect-accounting-sync', version: 1, at: nowIso(), data: A.db._dump() })), branch: Sync.cfg().branch || 'main' };
       if (meta) body.sha = meta.sha;
@@ -775,19 +775,19 @@ const Sync = (window.Sync = {
     if (!Sync.enabled()) return; Sync.busy = true; Sync.err = null; Sync.paint();
     try {
       const meta = await Sync.remoteMeta();
-      if (!meta) { if (ask) toast('ما في نسخة على GitHub لسا — ارفع أول', 'err'); return; }
+      if (!meta) { if (ask) toast('لا توجد نسخة على GitHub بعد — ارفع البيانات أولاً', 'err'); return; }
       const r = await fetch(Sync.url(), { headers: Sync.headers(true), cache: 'no-store' }); if (!r.ok) throw new Error('تعذّر التحميل ' + r.status);
-      const d = JSON.parse(await r.text()); if (d.app !== 'perfect-accounting-sync' || !d.data) throw new Error('الملف على GitHub مش بصيغة التطبيق');
+      const d = JSON.parse(await r.text()); if (d.app !== 'perfect-accounting-sync' || !d.data) throw new Error('الملف على GitHub ليس بصيغة التطبيق');
       const m = Sync.meta(); const dirty = m.localStamp !== Sync.localStamp() && A.st.txns.length;
       if (ask || dirty) {
         Sync.busy = false; Sync.paint();
         const n = Object.keys(d.data).filter((k) => k.startsWith('txns/')).length;
-        if (!(await confirmBox('تحميل من GitHub', 'النسخة على GitHub فيها ' + n + ' عملية (' + (d.at || '').slice(0, 16).replace('T', ' ') + '). هالجهاز فيه ' + A.st.txns.length + ' عملية.' + (dirty ? ' في تغييرات على هالجهاز ما انرفعت — رح تضيع.' : ''), 'حمّل واستبدل', !!dirty))) return;
+        if (!(await confirmBox('تحميل من GitHub', 'النسخة على GitHub فيها ' + n + ' قيد (' + (d.at || '').slice(0, 16).replace('T', ' ') + '). هذا الجهاز يحتوي ' + A.st.txns.length + ' قيد.' + (dirty ? ' توجد تعديلات على هذا الجهاز لم تُرفع وستُفقد.' : ''), 'تحميل واستبدال', !!dirty))) return;
       }
       await A.db._replace(d.data);
       Sync.setMeta({ sha: meta.sha, localStamp: Sync.localStamp(), at: nowIso() });
       try { localStorage.setItem('pa-local-updated', nowIso()); Sync.setMeta({ sha: meta.sha, localStamp: localStorage.getItem('pa-local-updated'), at: nowIso() }); } catch (x) { /* */ }
-      toast('انحمّلت البيانات من GitHub', 'ok');
+      toast('تم تحميل البيانات من GitHub', 'ok');
     } catch (e) { Sync.err = e.message; } finally { Sync.busy = false; Sync.paint(); }
   },
   schedule() { const c = Sync.cfg(); if (!Sync.enabled() || !c.auto) return; clearTimeout(Sync.timer); Sync.timer = setTimeout(() => Sync.push(), 4000); },
@@ -795,7 +795,7 @@ const Sync = (window.Sync = {
     const c = Sync.cfg(); if (!Sync.enabled() || !c.auto) return;
     try {
       const meta = await Sync.remoteMeta(); const m = Sync.meta(); const dirty = m.localStamp !== Sync.localStamp();
-      if (meta && meta.sha !== m.sha) { if (!dirty) await Sync.pull(false); else Sync.err = 'في تغييرات هون وعلى GitHub — اختار من الإعدادات أي نسخة تعتمد'; }
+      if (meta && meta.sha !== m.sha) { if (!dirty) await Sync.pull(false); else Sync.err = 'توجد تعديلات هنا وعلى GitHub — اختر من الإعدادات النسخة المعتمدة'; }
       else if (dirty) Sync.schedule();
     } catch (e) { Sync.err = e.message; }
     Sync.paint();
@@ -803,7 +803,7 @@ const Sync = (window.Sync = {
 });
 function syncCard() {
   const c = Sync.cfg();
-  return '<div class="card"><h3>مزامنة مع GitHub (اختيارية)</h3><p class="mut" style="font-size:13px">البيانات محفوظة على هالجهاز. المزامنة بتحفظ نسخة بمستودع GitHub <b>خاص (Private)</b> عشان ما تضيع وعشان تفتحها من أكثر من جهاز. اعمل مستودع خاص (مثلاً <code>perfect-data</code>) وتوكن Fine-grained بصلاحية Contents: Read and write على هالمستودع بس.</p>' +
+  return '<div class="card"><h3>مزامنة مع GitHub (اختيارية)</h3><p class="mut" style="font-size:13px">البيانات محفوظة على هذا الجهاز. تحفظ المزامنة نسخة في مستودع GitHub <b>خاص (Private)</b> لحمايتها ولإتاحتها على أكثر من جهاز. أنشئ مستودعاً خاصاً (مثلاً <code>perfect-data</code>) وتوكن Fine-grained بصلاحية Contents: Read and write على هذا المستودع فقط.</p>' +
     '<div class="fg">' + fld('المستودع (user/repo)', '<input id="gRepo" value="' + esc(c.repo || '') + '" placeholder="subsat85/perfect-data" dir="ltr">') + fld('التوكن', '<input id="gTok" type="password" value="' + esc(c.token || '') + '" dir="ltr">') +
     fld('الفرع', '<input id="gBr" value="' + esc(c.branch || 'main') + '" dir="ltr">') + '<div class="f" style="justify-content:end"><label><input type="checkbox" id="gAuto" ' + (c.auto !== false ? 'checked' : '') + '> رفع تلقائي بعد كل تعديل</label></div></div>' +
     '<p id="syncStatus" class="mut" style="font-size:13px">' + esc(Sync.status()) + '</p><div class="row"><button class="btn p" data-act="syncSave">حفظ واختبار</button><button class="btn" data-act="syncPush">رفع الآن</button><button class="btn" data-act="syncPull">تحميل من GitHub</button></div></div>';
@@ -811,14 +811,14 @@ function syncCard() {
 A.actions.syncSave = async () => {
   Sync.setCfg({ repo: $('#gRepo').value.trim(), token: $('#gTok').value.trim(), branch: $('#gBr').value.trim() || 'main', path: 'perfect-data.json', auto: $('#gAuto').checked });
   Sync.err = null;
-  try { const m = await Sync.remoteMeta(); toast('الاتصال شغّال' + (m ? ' — في نسخة على GitHub' : ' — لسا ما في نسخة'), 'ok'); } catch (e) { toast('تعذّر الاتصال: ' + e.message, 'err', 6000); }
+  try { const m = await Sync.remoteMeta(); toast('الاتصال شغّال' + (m ? ' — في نسخة على GitHub' : ' — لا توجد نسخة بعد'), 'ok'); } catch (e) { toast('تعذّر الاتصال: ' + e.message, 'err', 6000); }
   render();
 };
 A.actions.syncPush = async () => {
   if (!Sync.enabled()) return toast('احفظ إعداد المزامنة أول', 'err');
   const forced = Sync.err && Sync.err.includes('تغيّرت');
-  if (forced && !(await confirmBox('رفع بالقوة', 'رح تستبدل النسخة اللي على GitHub بنسخة هالجهاز.', 'ارفع', true))) return;
-  await Sync.push(forced); toast(Sync.err ? 'فشل: ' + Sync.err : 'انرفعت البيانات', Sync.err ? 'err' : 'ok'); render();
+  if (forced && !(await confirmBox('رفع بالقوة', 'ستُستبدل النسخة الموجودة على GitHub بنسخة هذا الجهاز.', 'ارفع', true))) return;
+  await Sync.push(forced); toast(Sync.err ? 'فشل: ' + Sync.err : 'تم رفع البيانات', Sync.err ? 'err' : 'ok'); render();
 };
 A.actions.syncPull = async () => { await Sync.pull(true); render(); };
 /* ===== نماذج العمليات ===== */
@@ -865,23 +865,23 @@ function openTx(t0) {
   const m = modal('<h2>' + esc(E.TYPES[d.type]) + (isNew ? '' : ' (مسودة)') + '</h2><div id="txHead" class="fg"></div><div id="txLines"></div><div id="txFoot"></div><div id="txErr"></div>' +
     '<div class="row end" style="margin-top:14px">' + (!isNew ? '<button class="btn d" id="txDel">حذف المسودة</button>' : '') + '<span style="flex:1"></span><button class="btn" id="txDraft">حفظ مسودة</button><button class="btn p" id="txPost">ترحيل</button></div>' + itemsDatalist(), { sticky: true });
   const head = m.querySelector('#txHead'), linesEl = m.querySelector('#txLines'), foot = m.querySelector('#txFoot');
-  const supOpts = '<option value="">— اختار التاجر —</option>' + A.st.suppliers.filter((s) => s.active !== false || s.id === d.supplierId).map((s) => opt(s.id, s.name, d.supplierId)).join('');
+  const supOpts = '<option value="">— اختر المورد —</option>' + A.st.suppliers.filter((s) => s.active !== false || s.id === d.supplierId).map((s) => opt(s.id, s.name, d.supplierId)).join('');
   const locOpts = (v) => locs().map((l) => opt(l.id, l.name, v)).join('');
-  const empOpts = '<option value="">— اختار الموظف —</option>' + A.st.employees.filter((x) => x.active !== false || x.id === d.empId).map((x) => opt(x.id, x.name + (x.code ? ' (' + x.code + ')' : ''), d.empId)).join('');
+  const empOpts = '<option value="">— اختر الموظف —</option>' + A.st.employees.filter((x) => x.active !== false || x.id === d.empId).map((x) => opt(x.id, x.name + (x.code ? ' (' + x.code + ')' : ''), d.empId)).join('');
   let h = fld('التاريخ', inp('date', d.date, 'date'));
   switch (d.type) {
     case 'sale': h += fld('رقم الفاتورة', inp('ref', d.ref)) + fld('الموقع الافتراضي للسطور', sel('locId', locOpts(d.locId))); break;
     case 'purchase': case 'preturn':
-      h += fld('التاجر', '<div class="row" style="flex-wrap:nowrap">' + sel('supplierId', supOpts) + '<button class="btn sm" id="newSup" title="تاجر جديد">＋</button></div>') + fld('رقم فاتورة التاجر', inp('ref', d.ref)) + fld(d.type === 'purchase' ? 'تدخل على' : 'تطلع من', sel('locId', locOpts(d.locId)));
-      if (d.type === 'purchase') h += fld('تكاليف إضافية (شحن، جمارك…)', inp('extras', d.extras, 'number', 'step="0.001"'), 'بتتوزع على الأصناف حسب قيمتها');
-      h += fld('الدفع', sel('pay', payOpts(d.pay, ['credit', 'cash', 'bank']))) + (d.type === 'purchase' ? '<div class="f" id="paidF"><label>المدفوع الآن</label>' + inp('paid', d.paid, 'number', 'step="0.001"') + '<span class="h">الباقي بيصير ذمة للتاجر</span></div>' : '');
+      h += fld('المورد', '<div class="row" style="flex-wrap:nowrap">' + sel('supplierId', supOpts) + '<button class="btn sm" id="newSup" title="مورد جديد">＋</button></div>') + fld('رقم فاتورة المورد', inp('ref', d.ref)) + fld(d.type === 'purchase' ? 'تدخل على' : 'تطلع من', sel('locId', locOpts(d.locId)));
+      if (d.type === 'purchase') h += fld('تكاليف الشراء الإضافية (شحن، جمارك…)', inp('extras', d.extras, 'number', 'step="0.001"'), 'تُوزَّع على الأصناف حسب قيمتها');
+      h += fld('طريقة السداد', sel('pay', payOpts(d.pay, ['credit', 'cash', 'bank']))) + (d.type === 'purchase' ? '<div class="f" id="paidF"><label>المدفوع الآن</label>' + inp('paid', d.paid, 'number', 'step="0.001"') + '<span class="h">يُقيَّد الباقي ذمةً دائنة للمورد</span></div>' : '');
       break;
     case 'ostock': case 'count': h += fld('الموقع', sel('locId', locOpts(d.locId))) + fld('ملاحظة', inp('desc', d.desc)); break;
     case 'transfer': h += fld('من', sel('from', locOpts(d.from))) + fld('إلى', sel('to', locOpts(d.to))) + fld('ملاحظة', inp('desc', d.desc)); break;
     case 'expense': {
       const sp = d.spread ? (d.spread.from && d.spread.from.slice(5) === '01' && d.spread.to === d.spread.from.slice(0, 4) + '-12' ? 'year' : 'season') : 'none';
-      h += fld('البند', sel('catId', '<option value="">— اختار —</option>' + cats().map((c) => opt(c.id, c.name, d.catId)).join(''))) + fld('المبلغ (كامل)', inp('amount', d.amount, 'number', 'step="0.001"')) +
-        fld('الدفع', sel('pay', payOpts(d.pay, ['cash', 'bank', 'unpaid'])), 'غير مدفوعة = بتظل مستحقة لحد ما تسددها') + fld('رقم الفاتورة', inp('ref', d.ref)) + fld('البيان', inp('desc', d.desc)) +
+      h += fld('البند', sel('catId', '<option value="">— اختر —</option>' + cats().map((c) => opt(c.id, c.name, d.catId)).join(''))) + fld('المبلغ (كامل)', inp('amount', d.amount, 'number', 'step="0.001"')) +
+        fld('طريقة السداد', sel('pay', payOpts(d.pay, ['cash', 'bank', 'unpaid'])), 'مستحق = يبقى التزاماً قائماً حتى السداد') + fld('رقم الفاتورة', inp('ref', d.ref)) + fld('البيان', inp('desc', d.desc)) +
         fld('فترة الفاتورة من', inp('billFrom', d.billFrom, 'date')) + fld('إلى', inp('billTo', d.billTo, 'date')) +
         fld('توزيع المصروف على الأرباح', '<select id="spMode">' + opt('none', 'لا — مصروف بتاريخه', sp) + opt('year', 'مصروف ثابت — السنة كاملة', sp) + opt('season', 'مصروف ثابت — حسب الموسم', sp) + '</select>') +
         '<div class="f" id="spY"><label>السنة</label><input id="spYear" type="number" value="' + esc(d.spread ? d.spread.from.slice(0, 4) : d.date.slice(0, 4)) + '"></div>' +
@@ -890,15 +890,15 @@ function openTx(t0) {
     }
     case 'billpay': {
       const open = unpaidBills();
-      h += fld('الفاتورة', sel('expenseId', '<option value="">— اختار —</option>' + open.map((b) => opt(b.t.id, catName(b.t.catId) + ' ' + (b.t.ref || '') + ' · ' + fdate(b.t.date) + ' · باقي ' + fmt(b.rem), d.expenseId)).join(''))) + fld('المبلغ', inp('amount', d.amount, 'number', 'step="0.001"')) + fld('من', sel('pay', payOpts(d.pay)));
+      h += fld('الفاتورة', sel('expenseId', '<option value="">— اختر —</option>' + open.map((b) => opt(b.t.id, catName(b.t.catId) + ' ' + (b.t.ref || '') + ' · ' + fdate(b.t.date) + ' · باقي ' + fmt(b.rem), d.expenseId)).join(''))) + fld('المبلغ', inp('amount', d.amount, 'number', 'step="0.001"')) + fld('السداد من', sel('pay', payOpts(d.pay)));
       break;
     }
-    case 'spay': h += fld('التاجر', sel('supplierId', supOpts), '<span id="supBal"></span>') + fld('المبلغ', inp('amount', d.amount, 'number', 'step="0.001"')) + fld('من', sel('pay', payOpts(d.pay))) + fld('رقم السند', inp('ref', d.ref)) + fld('ملاحظة', inp('desc', d.desc)); break;
+    case 'spay': h += fld('المورد', sel('supplierId', supOpts), '<span id="supBal"></span>') + fld('المبلغ', inp('amount', d.amount, 'number', 'step="0.001"')) + fld('السداد من', sel('pay', payOpts(d.pay))) + fld('رقم السند', inp('ref', d.ref)) + fld('ملاحظة', inp('desc', d.desc)); break;
     case 'income': case 'capital': case 'drawing': h += fld('المبلغ', inp('amount', d.amount, 'number', 'step="0.001"')) + fld(d.type === 'drawing' ? 'من' : 'إلى', sel('pay', payOpts(d.pay))) + fld('البيان', inp('desc', d.desc)); break;
     case 'money': h += fld('من', sel('from', payOpts(d.from))) + fld('إلى', sel('to', payOpts(d.to))) + fld('المبلغ', inp('amount', d.amount, 'number', 'step="0.001"')) + fld('ملاحظة', inp('desc', d.desc)); break;
-    case 'opening': h += fld('رصيد الكاش', inp('cash', d.cash, 'number', 'step="0.001"')) + fld('رصيد البنك', inp('bank', d.bank, 'number', 'step="0.001"')) + fld('ملاحظة', inp('desc', d.desc)); break;
+    case 'opening': h += fld('رصيد الصندوق', inp('cash', d.cash, 'number', 'step="0.001"')) + fld('رصيد البنك', inp('bank', d.bank, 'number', 'step="0.001"')) + fld('ملاحظة', inp('desc', d.desc)); break;
     case 'advance':
-      h += fld('الموظف', sel('empId', empOpts), '<span id="empInfo"></span>') + fld('المبلغ', inp('amount', d.amount, 'number', 'step="0.001"')) + fld('من', sel('pay', payOpts(d.pay))) +
+      h += fld('الموظف', sel('empId', empOpts), '<span id="empInfo"></span>') + fld('المبلغ', inp('amount', d.amount, 'number', 'step="0.001"')) + fld('السداد من', sel('pay', payOpts(d.pay))) +
         fld('طريقة الخصم', sel('mode', opt('full', 'كاملة من الراتب', d.mode) + opt('inst', 'أقساط شهرية', d.mode))) + '<div class="f" id="cntF"><label>عدد الأقساط</label>' + inp('count', d.count, 'number', 'min="1"') + '</div>' +
         fld('أول شهر خصم', inp('startMonth', d.startMonth, 'month')) + fld('ملاحظة', inp('desc', d.desc)) + '<div class="f" id="instInfo" style="justify-content:end"></div>';
       break;
@@ -906,7 +906,7 @@ function openTx(t0) {
     case 'payroll':
       h += fld('الموظف', sel('empId', empOpts)) + fld('شهر الراتب', inp('month', d.month, 'month')) + fld('الراتب الأساسي', inp('base', d.base, 'number', 'step="0.001"')) +
         fld('أيام الغياب', inp('absDays', d.absDays, 'number', 'step="0.5"')) + fld('خصم الغياب', inp('absDed', d.absDed, 'number', 'step="0.001"')) + fld('دقائق التأخير', inp('lateMin', d.lateMin, 'number')) + fld('خصم التأخير', inp('lateDed', d.lateDed, 'number', 'step="0.001"')) +
-        fld('خصومات أخرى', inp('otherDed', d.otherDed, 'number', 'step="0.001"')) + fld('مكافأة / إضافي', inp('bonus', d.bonus, 'number', 'step="0.001"')) + fld('خصم السلف', inp('advDed', d.advDed, 'number', 'step="0.001"'), '<span id="advDue"></span>') + fld('الدفع', sel('pay', payOpts(d.pay))) + fld('ملاحظة', inp('desc', d.desc));
+        fld('خصومات أخرى', inp('otherDed', d.otherDed, 'number', 'step="0.001"')) + fld('مكافأة / إضافي', inp('bonus', d.bonus, 'number', 'step="0.001"')) + fld('خصم السلف', inp('advDed', d.advDed, 'number', 'step="0.001"'), '<span id="advDue"></span>') + fld('طريقة السداد', sel('pay', payOpts(d.pay))) + fld('ملاحظة', inp('desc', d.desc));
       break;
   }
   head.innerHTML = h;
@@ -933,7 +933,7 @@ function openTx(t0) {
     linesEl.innerHTML = '<div class="sec">الأصناف (' + d.lines.length + ')</div><div class="tw"><table class="lines"><thead><tr><th>#</th>' + COLS.map((c) => '<th>' + c[1] + '</th>').join('') + '<th></th></tr></thead><tbody>' +
       d.lines.map((l, i) => '<tr data-i="' + i + '"><td class="mut">' + (i + 1) + '</td>' + COLS.map((c) => {
         const k = c[0];
-        if (k === 'item') return '<td class="it"><input list="itemsDL" data-lk="item" value="' + esc(itemLabel(l.itemId) || l._txt || '') + '" placeholder="باركود أو اسم">' + (!l.itemId && l._txt ? '<div class="neg" style="font-size:12px">صنف مش معروف ' + (['purchase', 'ostock'].includes(d.type) ? '<button class="btn sm" data-newitem="' + i + '">＋ إضافة</button>' : '') + '</div>' : '') + '</td>';
+        if (k === 'item') return '<td class="it"><input list="itemsDL" data-lk="item" value="' + esc(itemLabel(l.itemId) || l._txt || '') + '" placeholder="باركود أو اسم">' + (!l.itemId && l._txt ? '<div class="neg" style="font-size:12px">صنف غير معرّف ' + (['purchase', 'ostock'].includes(d.type) ? '<button class="btn sm" data-newitem="' + i + '">＋ إضافة</button>' : '') + '</div>' : '') + '</td>';
         if (k === 'loc') return '<td><select data-lk="locId">' + locOpts(l.locId) + '</select></td>';
         if (k[0] === '=') return '<td class="n" data-calc="' + k + '">' + lineCalc(l, k) + '</td>';
         return '<td><input class="' + (k === 'qty' || k === 'counted' ? 'q' : 'm') + '" type="number" step="0.001" data-lk="' + k + '" value="' + esc(l[k] == null ? '' : l[k]) + '"></td>';
@@ -978,7 +978,7 @@ function openTx(t0) {
     const tot = E.total(normalize(d)); let f = '';
     if (d.type === 'sale') {
       if (!payTouched) { d.cash = tot; d.bank = 0; const c = head.parentNode.querySelector('[data-k="cash"]'); if (c) { c.value = tot; head.parentNode.querySelector('[data-k="bank"]').value = 0; } }
-      if (!foot.querySelector('[data-k="cash"]')) foot.innerHTML = '<div class="fg" style="margin-top:12px">' + fld('مقبوض كاش', inp('cash', d.cash, 'number', 'step="0.001"')) + fld('مقبوض فيزا / بنك', inp('bank', d.bank, 'number', 'step="0.001"')) + '<div class="f" style="justify-content:end"><div class="row"><button class="btn sm" id="allCash">الكل كاش</button><button class="btn sm" id="allBank">الكل فيزا</button></div></div><div class="f" style="justify-content:end"><span class="tot" id="totV"></span></div></div>';
+      if (!foot.querySelector('[data-k="cash"]')) foot.innerHTML = '<div class="fg" style="margin-top:12px">' + fld('المقبوض نقداً', inp('cash', d.cash, 'number', 'step="0.001"')) + fld('المقبوض بالبطاقة / البنك', inp('bank', d.bank, 'number', 'step="0.001"')) + '<div class="f" style="justify-content:end"><div class="row"><button class="btn sm" id="allCash">كامل المبلغ نقداً</button><button class="btn sm" id="allBank">كامل المبلغ بالبطاقة</button></div></div><div class="f" style="justify-content:end"><span class="tot" id="totV"></span></div></div>';
       foot.querySelector('#allCash').onclick = () => { payTouched = true; d.cash = E.total(normalize(d)); d.bank = 0; foot.querySelector('[data-k="cash"]').value = d.cash; foot.querySelector('[data-k="bank"]').value = 0; };
       foot.querySelector('#allBank').onclick = () => { payTouched = true; d.bank = E.total(normalize(d)); d.cash = 0; foot.querySelector('[data-k="cash"]').value = 0; foot.querySelector('[data-k="bank"]').value = d.bank; };
       foot.querySelector('#totV').textContent = 'الإجمالي: ' + fmt(tot) + ' · ' + fq(E.qtyOf(d)) + ' قطعة';
@@ -992,8 +992,8 @@ function openTx(t0) {
     if (d.type === 'expense') { const mode = head.querySelector('#spMode').value; head.querySelector('#spY').style.display = mode === 'year' ? '' : 'none'; head.querySelector('#spF').style.display = head.querySelector('#spT').style.display = mode === 'season' ? '' : 'none'; }
     if (d.type === 'advance') { head.querySelector('#cntF').style.display = d.mode === 'inst' ? '' : 'none'; head.querySelector('#instInfo').innerHTML = d.mode === 'inst' && num(d.count) ? '<span class="mut">القسط الشهري ≈ ' + fmt(num(d.amount) / num(d.count)) + '</span>' : ''; }
     if (d.type === 'advance' || d.type === 'advpay') { const ei = head.querySelector('#empInfo'); if (ei) ei.textContent = d.empId ? 'سلف باقية: ' + fmt(E.advances(A.st, d.empId).reduce((s, a) => s + (a.over ? -a.paid : a.remaining), 0)) : ''; }
-    if (d.type === 'spay') { const b = head.querySelector('#supBal'); if (b) b.textContent = d.supplierId ? 'الرصيد المستحق له: ' + fmt(-(E.partyBalances(A.L, E.ACC.ap)[d.supplierId] || 0)) : ''; }
-    if (d.type === 'payroll') { const b = head.querySelector('#advDue'); if (b) b.textContent = d.empId ? 'المستحق هالشهر: ' + fmt(E.advanceDue(A.st, d.empId, d.month)) : ''; }
+    if (d.type === 'spay') { const b = head.querySelector('#supBal'); if (b) b.textContent = d.supplierId ? 'الرصيد الدائن: ' + fmt(-(E.partyBalances(A.L, E.ACC.ap)[d.supplierId] || 0)) : ''; }
+    if (d.type === 'payroll') { const b = head.querySelector('#advDue'); if (b) b.textContent = d.empId ? 'المستحق هذا الشهر: ' + fmt(E.advanceDue(A.st, d.empId, d.month)) : ''; }
   }
   m.addEventListener('input', (e) => {
     const k = e.target.dataset.k; if (!k) return;
@@ -1027,7 +1027,7 @@ function openTx(t0) {
 
   m.querySelector('#txDraft').onclick = async () => {
     const t = normalize(d); t.status = 'draft'; t.updatedAt = nowIso();
-    await put('txns', t); audit('حفظ مسودة', E.TYPES[t.type] + ' ' + (t.ref || '') + ' · ' + fmt(E.total(t))); closeModal(m); toast('انحفظت كمسودة', 'ok');
+    await put('txns', t); audit('حفظ مسودة', E.TYPES[t.type] + ' ' + (t.ref || '') + ' · ' + fmt(E.total(t))); closeModal(m); toast('تم الحفظ كمسودة', 'ok');
   };
   m.querySelector('#txPost').onclick = async () => {
     const t = normalize(d);
@@ -1036,11 +1036,11 @@ function openTx(t0) {
     const box = m.querySelector('#txErr');
     if (errs.length) { box.innerHTML = '<div class="errs">' + errs.map(esc).join('<br>') + '</div>'; box.scrollIntoView({ block: 'nearest' }); toast(errs[0], 'err', 6000); return; }
     const dup = E.duplicates(t, A.st.txns);
-    if (dup.length && !(await confirmBox('عملية مكررة؟', 'في ' + dup.length + ' عملية بنفس الرقم/الجهة' + (t.type === 'sale' ? ' (أرقام فواتير مستوردة قبل)' : '') + '. بدك ترحّل كمان؟', 'رحّل', true))) return;
+    if (dup.length && !(await confirmBox('قيد مكرر؟', 'في ' + dup.length + ' قيد بنفس الرقم/الجهة' + (t.type === 'sale' ? ' (أرقام فواتير مستوردة قبل)' : '') + '. هل تريد الترحيل؟', 'رحّل', true))) return;
     if (t.type === 'purchase') t.lines.forEach((l) => { const it = itemById(l.itemId); if (it && l.sp && num(l.sp) !== num(it.price)) { it.price = num(l.sp); put('items', it); } });
     t.status = 'posted'; t.postedAt = nowIso();
     await put('txns', t); audit('ترحيل', E.TYPES[t.type] + ' ' + (t.ref || '') + ' · ' + t.date + ' · ' + fmt(E.total(t)));
-    closeModal(m); toast('انرحّلت العملية', 'ok');
+    closeModal(m); toast('تم ترحيل القيد', 'ok');
   };
   const del = m.querySelector('#txDel'); if (del) del.onclick = async () => { if (!(await confirmBox('حذف المسودة', 'رح تنحذف المسودة نهائياً.', 'احذف', true))) return; await remove('txns', d.id); audit('حذف مسودة', E.TYPES[d.type] + ' ' + (d.ref || '')); closeModal(m); };
   return m;
@@ -1075,10 +1075,10 @@ function viewTx(id) {
   let h = '<h2>' + esc(E.TYPES[t.type]) + ' ' + esc(t.ref || '') + '</h2>';
   if (t.status === 'void') h += '<div class="errs">ملغاة · ' + esc(t.voidReason || '') + ' · ' + fdate((t.voidAt || '').slice(0, 10)) + '</div>';
   h += '<div class="card"><dl class="kv"><dt>التاريخ</dt><dd>' + fdate(t.date) + '</dd><dt>التفاصيل</dt><dd>' + esc(txSummary(t)) + '</dd>' + (t.type !== 'transfer' && t.type !== 'count' ? '<dt>المبلغ</dt><dd><b>' + fmt(tot) + '</b></dd>' : '') +
-    (t.pay ? '<dt>الدفع</dt><dd>' + E.PAY_NAMES[t.pay] + (t.type === 'purchase' && t.pay !== 'credit' ? ' · مدفوع ' + fmt(t.paid) : '') + '</dd>' : '') + (t.type === 'sale' ? '<dt>الدفع</dt><dd>كاش ' + fmt(t.cash) + ' · فيزا ' + fmt(t.bank) + '</dd>' : '') +
+    (t.pay ? '<dt>طريقة السداد</dt><dd>' + E.PAY_NAMES[t.pay] + (t.type === 'purchase' && t.pay !== 'credit' ? ' · مدفوع ' + fmt(t.paid) : '') + '</dd>' : '') + (t.type === 'sale' ? '<dt>طريقة السداد</dt><dd>نقداً ' + fmt(t.cash) + ' · بطاقة ' + fmt(t.bank) + '</dd>' : '') +
     (t.type === 'payroll' ? '<dt>تفصيل</dt><dd>أساسي ' + fmt(t.base) + ' − غياب ' + fmt(t.absDed) + ' (' + fq(t.absDays) + ' يوم) − تأخير ' + fmt(t.lateDed) + ' − أخرى ' + fmt(t.otherDed) + ' + مكافأة ' + fmt(t.bonus) + ' − سلف ' + fmt(t.advDed) + '</dd>' : '') +
     (t.billFrom ? '<dt>فترة الفاتورة</dt><dd>' + fdate(t.billFrom) + ' — ' + fdate(t.billTo) + '</dd>' : '') +
-    (t.desc ? '<dt>ملاحظة</dt><dd>' + esc(t.desc) + '</dd>' : '') + '<dt>انرحّلت</dt><dd class="mut">' + esc((t.postedAt || '').replace('T', ' ').slice(0, 16)) + '</dd></dl></div>';
+    (t.desc ? '<dt>ملاحظة</dt><dd>' + esc(t.desc) + '</dd>' : '') + '<dt>تاريخ الترحيل</dt><dd class="mut">' + esc((t.postedAt || '').replace('T', ' ').slice(0, 16)) + '</dd></dl></div>';
   if (t.lines && t.lines.length) {
     const calc = A.L.countCalc[t.id] || [];
     h += '<div class="tw"><table><thead><tr><th>الصنف</th><th>الباركود</th>' + (t.type === 'sale' ? '<th>الفاتورة</th><th>الموقع</th><th class="n">الكمية</th><th class="n">السعر</th><th class="n">الخصم</th><th class="n">الصافي</th>' : t.type === 'count' ? '<th class="n">النظام</th><th class="n">المعدود</th><th class="n">الفرق</th><th class="n">القيمة</th>' : t.type === 'transfer' ? '<th class="n">الكمية</th>' : '<th class="n">الكمية</th><th class="n">التكلفة</th><th class="n">الإجمالي</th>') + '</tr></thead><tbody>' +
@@ -1090,17 +1090,17 @@ function viewTx(id) {
       ents.slice(0, 40).map((e) => e.lines.map((l) => '<tr><td>' + fdate(e.date) + '</td><td>' + esc(E.accName(l.acc, A.st.cfg)) + (l.party && l.acc === E.ACC.ap ? ' · ' + esc(supName(l.party)) : l.party && l.acc === E.ACC.adv ? ' · ' + esc(empName(l.party)) : '') + '</td><td class="n">' + (l.dr ? fmt(l.dr) : '') + '</td><td class="n">' + (l.cr ? fmt(l.cr) : '') + '</td><td class="mut">' + esc(l.memo) + '</td></tr>').join('')).join('') + '</tbody></table></div>' + (ents.length > 40 ? '<p class="mut">…و ' + (ents.length - 40) + ' قيد شهري ثاني</p>' : '');
   }
   const locked = A.st.cfg.lockDate && t.date <= A.st.cfg.lockDate;
-  h += '<div class="row end" style="margin-top:14px">' + (t.type === 'expense' && t.pay === 'unpaid' && t.status === 'posted' && unpaidBills().some((b) => b.t.id === t.id) ? '<button class="btn b" id="vPay">تسديد الفاتورة</button>' : '') +
-    '<button class="btn" id="vCopy">نسخ كعملية جديدة</button>' + (t.status === 'posted' ? '<button class="btn d" id="vVoid" ' + (locked ? 'disabled title="الفترة مقفلة"' : '') + '>إلغاء العملية</button>' : '') + '</div>';
+  h += '<div class="row end" style="margin-top:14px">' + (t.type === 'expense' && t.pay === 'unpaid' && t.status === 'posted' && unpaidBills().some((b) => b.t.id === t.id) ? '<button class="btn b" id="vPay">سداد المصروف المستحق</button>' : '') +
+    '<button class="btn" id="vCopy">نسخ كقيد جديد</button>' + (t.status === 'posted' ? '<button class="btn d" id="vVoid" ' + (locked ? 'disabled title="الفترة مقفلة"' : '') + '>إلغاء القيد</button>' : '') + '</div>';
   const m = modal(h);
   m.querySelector('#vCopy').onclick = () => { const c = clone(t); c.id = uid(); c.status = 'draft'; c.createdAt = nowIso(); delete c.postedAt; delete c.voidAt; delete c.voidReason; c.date = today(); closeModal(m); openTx(c); };
   const vp = m.querySelector('#vPay'); if (vp) vp.onclick = () => { closeModal(m); const b = unpaidBills().find((x) => x.t.id === t.id); openTx(newTx('billpay', { expenseId: t.id, amount: b ? b.rem : t.amount })); };
   const vv = m.querySelector('#vVoid'); if (vv) vv.onclick = async () => {
     const deps = A.st.txns.filter((x) => x.status === 'posted' && x.type === 'billpay' && x.expenseId === t.id);
-    if (deps.length) return toast('ألغِ تسديدات هالفاتورة أول (' + deps.length + ')', 'err', 5000);
-    const reason = await askText('إلغاء العملية', 'سبب الإلغاء (إجباري)'); if (!reason) return;
+    if (deps.length) return toast('ألغِ قيود سداد هذا المصروف أولاً (' + deps.length + ')', 'err', 5000);
+    const reason = await askText('إلغاء القيد', 'سبب الإلغاء (إجباري)'); if (!reason) return;
     const x = clone(t); x.status = 'void'; x.voidReason = reason; x.voidAt = nowIso();
-    await put('txns', x); audit('إلغاء', E.TYPES[t.type] + ' ' + (t.ref || '') + ' · ' + t.date + ' · ' + fmt(tot) + ' · السبب: ' + reason); closeModal(m); toast('انلغت العملية', 'ok');
+    await put('txns', x); audit('إلغاء', E.TYPES[t.type] + ' ' + (t.ref || '') + ' · ' + t.date + ' · ' + fmt(tot) + ' · السبب: ' + reason); closeModal(m); toast('تم إلغاء القيد', 'ok');
   };
 }
 
@@ -1110,7 +1110,7 @@ function editItem(it0, cb) {
   const catsList = Array.from(new Set(A.st.items.map((i) => i.cat).filter(Boolean)));
   const m = modal('<h2>' + (it0.id ? 'تعديل صنف' : 'صنف جديد') + '</h2><div class="fg">' + fld('الباركود', '<input id="iBc" value="' + esc(it.barcode) + '">') + fld('الاسم / الموديل', '<input id="iName" value="' + esc(it.name) + '">') +
     fld('التصنيف', '<input id="iCat" list="catDL" value="' + esc(it.cat) + '"><datalist id="catDL">' + catsList.map((c) => '<option value="' + esc(c) + '">').join('') + '</datalist>') + fld('سعر البيع', '<input id="iPrice" type="number" step="0.001" value="' + esc(it.price) + '">') +
-    fld('تكلفة افتراضية', '<input id="iCost" type="number" step="0.001" value="' + esc(it.cost) + '">', 'بتنستعمل بس إذا ما في مشتريات للصنف') + fld('طابق البيع الافتراضي', '<select id="iLoc"><option value="">—</option>' + locs().map((l) => opt(l.id, l.name, it.loc)).join('') + '</select>') +
+    fld('تكلفة افتراضية', '<input id="iCost" type="number" step="0.001" value="' + esc(it.cost) + '">', 'تُستخدم فقط عند عدم وجود مشتريات للصنف') + fld('طابق البيع الافتراضي', '<select id="iLoc"><option value="">—</option>' + locs().map((l) => opt(l.id, l.name, it.loc)).join('') + '</select>') +
     fld('الحالة', '<select id="iAct">' + opt('1', 'فعّال', it.active !== false ? '1' : '0') + opt('0', 'موقوف', it.active !== false ? '1' : '0') + '</select>') + '</div><div id="iErr"></div><div class="row end" style="margin-top:12px"><button class="btn p" id="iSave">حفظ</button></div>', { small: true });
   m.querySelector('#iSave').onclick = async () => {
     const bc = m.querySelector('#iBc').value.trim(), name = m.querySelector('#iName').value.trim();
@@ -1123,18 +1123,18 @@ function editItem(it0, cb) {
 }
 function editSupplier(s0, cb) {
   const s = Object.assign({ id: uid(), name: '', phone: '', notes: '', active: true }, s0);
-  const m = modal('<h2>' + (s0.id ? 'تعديل تاجر' : 'تاجر جديد') + '</h2><div class="fg">' + fld('الاسم', '<input id="sN" value="' + esc(s.name) + '">') + fld('الهاتف', '<input id="sP" value="' + esc(s.phone) + '">') + fld('ملاحظات', '<input id="sNo" value="' + esc(s.notes) + '">') + fld('الحالة', '<select id="sA">' + opt('1', 'فعّال', s.active !== false ? '1' : '0') + opt('0', 'موقوف', s.active !== false ? '1' : '0') + '</select>') + '</div><p class="mut" style="font-size:13px">رصيد قديم للتاجر؟ سجّله كفاتورة شراء آجل بتاريخ البدء، أو من الإعدادات ← الأرصدة الافتتاحية.</p><div id="sE"></div><div class="row end"><button class="btn p" id="sS">حفظ</button></div>', { small: true });
+  const m = modal('<h2>' + (s0.id ? 'تعديل مورد' : 'مورد جديد') + '</h2><div class="fg">' + fld('الاسم', '<input id="sN" value="' + esc(s.name) + '">') + fld('الهاتف', '<input id="sP" value="' + esc(s.phone) + '">') + fld('ملاحظات', '<input id="sNo" value="' + esc(s.notes) + '">') + fld('الحالة', '<select id="sA">' + opt('1', 'فعّال', s.active !== false ? '1' : '0') + opt('0', 'موقوف', s.active !== false ? '1' : '0') + '</select>') + '</div><p class="mut" style="font-size:13px">رصيد سابق للمورد؟ يُسجّل كفاتورة شراء آجلة بتاريخ البدء.</p><div id="sE"></div><div class="row end"><button class="btn p" id="sS">حفظ</button></div>', { small: true });
   m.querySelector('#sS').onclick = async () => {
     const n = m.querySelector('#sN').value.trim(); if (!n) { m.querySelector('#sE').innerHTML = '<div class="errs">الاسم مطلوب</div>'; return; }
-    if (A.st.suppliers.some((x) => x.name === n && x.id !== s.id)) { m.querySelector('#sE').innerHTML = '<div class="errs">في تاجر بنفس الاسم</div>'; return; }
+    if (A.st.suppliers.some((x) => x.name === n && x.id !== s.id)) { m.querySelector('#sE').innerHTML = '<div class="errs">في مورد بنفس الاسم</div>'; return; }
     Object.assign(s, { name: n, phone: m.querySelector('#sP').value.trim(), notes: m.querySelector('#sNo').value.trim(), active: m.querySelector('#sA').value === '1' });
     A.st.suppliers = A.st.suppliers.filter((x) => x.id !== s.id).concat([s]);
-    await put('suppliers', s); audit(s0.id ? 'تعديل تاجر' : 'إضافة تاجر', n); closeModal(m); if (cb) cb(s);
+    await put('suppliers', s); audit(s0.id ? 'تعديل مورد' : 'إضافة مورد', n); closeModal(m); if (cb) cb(s);
   };
 }
 function editEmployee(e0, cb) {
   const e = Object.assign({ id: uid(), name: '', code: '', phone: '', job: '', salary: '', hireDate: today(), endDate: '', endReason: '', active: true, notes: '' }, e0);
-  const m = modal('<h2>' + (e0.id ? 'تعديل موظف' : 'موظف جديد') + '</h2><div class="fg">' + fld('الاسم', '<input id="eN" value="' + esc(e.name) + '">') + fld('رقم الموظف', '<input id="eC" value="' + esc(e.code) + '">', 'نفس الرقم اللي بتطبيق الدوام عشان الربط') +
+  const m = modal('<h2>' + (e0.id ? 'تعديل موظف' : 'موظف جديد') + '</h2><div class="fg">' + fld('الاسم', '<input id="eN" value="' + esc(e.name) + '">') + fld('رقم الموظف', '<input id="eC" value="' + esc(e.code) + '">', 'نفس الرقم في تطبيق الدوام لغرض الربط') +
     fld('الوظيفة', '<input id="eJ" value="' + esc(e.job) + '">') + fld('الهاتف', '<input id="eP" value="' + esc(e.phone) + '">') + fld('الراتب الشهري', '<input id="eS" type="number" step="0.001" value="' + esc(e.salary) + '">') + fld('تاريخ التعيين', '<input id="eH" type="date" value="' + esc(e.hireDate) + '">') + fld('ملاحظات', '<input id="eNo" value="' + esc(e.notes) + '">') +
     '</div><div id="eE"></div><div class="row end" style="margin-top:12px"><button class="btn p" id="eSv">حفظ</button></div>', { small: true });
   m.querySelector('#eSv').onclick = async () => {
@@ -1150,8 +1150,8 @@ function terminateEmployee(id) {
   const e = A.st.employees.find((x) => x.id === id); if (!e) return;
   const rem = r3(E.advances(A.st, id).reduce((s, a) => s + (a.over ? -a.paid : a.remaining), 0));
   const m = modal('<h2>إنهاء عمل ' + esc(e.name) + '</h2><div class="fg">' + fld('آخر يوم عمل', '<input id="tD" type="date" value="' + today() + '">') + fld('السبب', '<input id="tR">') + '</div>' +
-    (rem > 0 ? '<div class="warns">عليه سلف باقية: <b>' + fmt(rem) + '</b> — اخصمها من آخر راتب أو سجّل سدادها نقداً.</div>' : '') +
-    '<p class="mut">الموظف بيضل بالسجلات والتقارير، بس ما بيطلع برواتب الأشهر بعد آخر يوم.</p><div class="row end"><button class="btn d" id="tGo">إنهاء العمل</button></div>', { small: true });
+    (rem > 0 ? '<div class="warns">عليه سلف باقية: <b>' + fmt(rem) + '</b> — تُخصم من آخر راتب أو يُسجّل استردادها نقداً.</div>' : '') +
+    '<p class="mut">يبقى الموظف في السجلات والتقارير، ولا يظهر في كشوف رواتب الأشهر اللاحقة لآخر يوم عمل.</p><div class="row end"><button class="btn d" id="tGo">إنهاء العمل</button></div>', { small: true });
   m.querySelector('#tGo').onclick = async () => {
     const x = clone(e); x.endDate = m.querySelector('#tD').value; x.endReason = m.querySelector('#tR').value.trim(); x.active = false;
     await put('employees', x); audit('إنهاء عمل موظف', x.name + ' · ' + x.endDate + ' · ' + x.endReason); closeModal(m);
@@ -1159,15 +1159,15 @@ function terminateEmployee(id) {
 }
 async function rehireEmployee(id) {
   const e = A.st.employees.find((x) => x.id === id); if (!e) return;
-  if (!(await confirmBox('إرجاع ' + e.name, 'بيرجع الموظف فعّال من اليوم.', 'إرجاع'))) return;
+  if (!(await confirmBox('إرجاع ' + e.name, 'يُعاد الموظف إلى الخدمة اعتباراً من اليوم.', 'إرجاع'))) return;
   const x = clone(e); x.active = true; x.endDate = ''; x.endReason = ''; x.hireDate = today();
   await put('employees', x); audit('إرجاع موظف', x.name);
 }
 /* ===== الصفحات ===== */
 const NEW_GROUPS = [
-  ['البضاعة', [['sale', 'بيع', 'إدخال يدوي'], ['purchase', 'فاتورة شراء', 'من تاجر'], ['transfer', 'نقل بضاعة', 'بين المواقع'], ['count', 'جرد / تسوية', 'تصحيح الكميات'], ['preturn', 'مرتجع للتاجر', ''], ['ostock', 'مخزون افتتاحي', 'لكل موقع']]],
-  ['الفلوس', [['expense', 'مصروف / فاتورة', 'كهرباء، مياه، نت…'], ['billpay', 'تسديد فاتورة', 'مستحقة'], ['spay', 'دفعة لتاجر', ''], ['income', 'إيراد آخر', ''], ['money', 'كاش ↔ بنك', ''], ['capital', 'إضافة رأس مال', ''], ['drawing', 'مسحوبات شخصية', ''], ['opening', 'أرصدة افتتاحية', 'كاش وبنك']]],
-  ['الموظفين', [['advance', 'سلفة', 'كاملة أو أقساط'], ['advpay', 'سداد سلفة نقداً', ''], ['payroll', 'راتب موظف', 'أو من صفحة الرواتب']]],
+  ['المبيعات والمخزون', [['sale', 'فاتورة مبيعات', 'إدخال يدوي'], ['purchase', 'فاتورة شراء', 'من مورد'], ['transfer', 'تحويل مخزني', 'بين المواقع'], ['count', 'جرد وتسوية', 'تسوية فروقات الجرد'], ['preturn', 'مردودات مشتريات', ''], ['ostock', 'مخزون أول المدة', 'لكل موقع']]],
+  ['النقدية والمصروفات', [['expense', 'قيد مصروف', 'كهرباء، مياه، إنترنت…'], ['billpay', 'سداد مصروف مستحق', ''], ['spay', 'سند صرف لمورد', ''], ['income', 'إيرادات أخرى', ''], ['money', 'تحويل بين الصندوق والبنك', ''], ['capital', 'زيادة رأس المال', ''], ['drawing', 'مسحوبات المالك', ''], ['opening', 'أرصدة افتتاحية', 'الصندوق والبنك']]],
+  ['شؤون الموظفين', [['advance', 'سلفة موظف', 'خصم كامل أو أقساط'], ['advpay', 'استرداد سلفة نقداً', ''], ['payroll', 'قيد راتب', 'أو من صفحة الرواتب']]],
 ];
 A.actions.new = (type) => openTx(newTx(type));
 A.actions.view = (id) => viewTx(id);
@@ -1193,7 +1193,7 @@ function tabs(key, list, def) {
 document.addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (!b) return; A.f[b.closest('[data-tabs]').dataset.tabs] = b.dataset.tab; render(); });
 function table(head, rows, foot, opts) {
   opts = opts || {};
-  if (!rows.length) return '<div class="empty">' + (opts.empty || 'ما في بيانات') + '</div>';
+  if (!rows.length) return '<div class="empty">' + (opts.empty || 'لا توجد بيانات') + '</div>';
   const isN = (i) => (opts.num || []).includes(i);
   return '<div class="tw"' + (opts.maxH ? ' style="max-height:' + opts.maxH + 'px"' : '') + '><table><thead><tr>' + head.map((h, i) => '<th class="' + (isN(i) ? 'n' : '') + '">' + h + '</th>').join('') + '</tr></thead><tbody>' +
     rows.map((r) => '<tr' + (r._id ? ' class="click" data-act="view" data-arg="' + r._id + '"' : r._act ? ' class="click" data-act="' + r._act[0] + '" data-arg="' + esc(r._act[1]) + '"' : '') + '>' + r.map((c, i) => '<td class="' + (isN(i) ? 'n' : '') + '">' + (c == null ? '' : c) + '</td>').join('') + '</tr>').join('') + '</tbody>' +
@@ -1211,21 +1211,21 @@ PAGES.home = (v) => {
   const ap = -(bal[E.ACC.ap] || 0), adv = bal[E.ACC.adv] || 0, bills = -(bal[E.ACC.accrued] || 0);
   const drafts = A.st.txns.filter((x) => x.status === 'draft');
   const k = (label, val, cls) => '<div class="kpi ' + (cls || '') + '"><span>' + label + '</span><b>' + val + '</b></div>';
-  let h = (A.st.txns.length ? '' : '<div class="card"><h3>البداية</h3><ol style="margin:0;padding-inline-start:20px"><li>من <a href="#/stock">المخزون والأصناف</a> استورد ملف الأصناف (باركود، اسم، تصنيف، سعر، تكلفة).</li><li>سجّل <b>المخزون الافتتاحي</b> لكل موقع (أو استورد ملف جرد).</li><li>سجّل <b>أرصدة الكاش والبنك</b> الافتتاحية، وأضف التجار والموظفين.</li><li>بعدها: فواتير الشراء، المبيعات (يدوي أو Excel)، المصاريف، والرواتب.</li></ol></div>') +
+  let h = (A.st.txns.length ? '' : '<div class="card"><h3>البداية</h3><ol style="margin:0;padding-inline-start:20px"><li>من <a href="#/stock">المخزون والأصناف</a> استورد ملف الأصناف (باركود، اسم، تصنيف، سعر، تكلفة).</li><li>سجّل <b>مخزون أول المدة</b> لكل موقع (أو استورد ملف جرد).</li><li>سجّل <b>أرصدة الصندوق والبنك</b> الافتتاحية، وأضف الموردين والموظفين.</li><li>ثم: فواتير الشراء، المبيعات (يدوياً أو من Excel)، المصروفات، والرواتب.</li></ol></div>') +
     '<div class="kpis">' + k('مبيعات اليوم', fmt(pd.sales)) + k('مبيعات الشهر', fmt(pm.sales)) + k('مجمل ربح الشهر', fmt(pm.gross), pm.gross >= 0 ? 'pos' : 'neg') + k('صافي ربح الشهر', fmt(pm.net), pm.net >= 0 ? 'pos' : 'neg') +
-    k('مصاريف + رواتب الشهر', fmt(pm.expTotal + pm.salaries)) + k('الكاش', fmt(bal[E.ACC.cash] || 0)) + k('البنك', fmt(bal[E.ACC.bank] || 0)) + k('قيمة المخزون (تكلفة)', fmt(stockVal)) +
-    k('عدد القطع', fq(stockQty), '') + k('مستحق للتجار', fmt(ap)) + k('سلف على الموظفين', fmt(adv)) + k('فواتير غير مدفوعة', fmt(bills)) + '</div>';
-  h += '<div class="card"><h3>إدخال سريع</h3>' + quickBtns([['sale', 'بيع'], ['purchase', 'فاتورة شراء'], ['expense', 'مصروف / فاتورة'], ['transfer', 'نقل بضاعة'], ['advance', 'سلفة'], ['spay', 'دفعة لتاجر']]) +
+    k('المصروفات والرواتب (الشهر)', fmt(pm.expTotal + pm.salaries)) + k('الصندوق (النقدية)', fmt(bal[E.ACC.cash] || 0)) + k('البنك', fmt(bal[E.ACC.bank] || 0)) + k('قيمة المخزون بالتكلفة', fmt(stockVal)) +
+    k('كمية المخزون (قطعة)', fq(stockQty), '') + k('الذمم الدائنة (الموردون)', fmt(ap)) + k('ذمم الموظفين (سلف)', fmt(adv)) + k('مصروفات مستحقة غير مسددة', fmt(bills)) + '</div>';
+  h += '<div class="card"><h3>إدخال سريع</h3>' + quickBtns([['sale', 'فاتورة مبيعات'], ['purchase', 'فاتورة شراء'], ['expense', 'قيد مصروف'], ['transfer', 'تحويل مخزني'], ['advance', 'سلفة موظف'], ['spay', 'سند صرف لمورد']]) +
     '<div class="row" style="margin-top:8px"><button class="btn b" data-act="impSales">استيراد مبيعات Excel</button><button class="btn b" data-act="impPurch">استيراد فاتورة شراء Excel</button><a class="btn" href="#/staff">الرواتب</a></div></div>';
   // المخزون حسب الموقع
   const perLoc = locs().map((l) => { let q = 0, val = 0; Object.values(L.stock).forEach((s) => { const x = s.loc[l.id] || 0; q += x; val += x * s.avg; }); return [esc(l.name), fq(q), fmt(val)]; });
   h += '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))"><div class="card"><h3>المخزون حسب الموقع</h3>' + table(['الموقع', 'القطع', 'القيمة'], perLoc, null, { num: [1, 2] }) + '</div>';
   const ub = unpaidBills();
-  h += '<div class="card"><h3>تنبيهات</h3>' + (drafts.length ? '<p>📝 في <a href="#/txns" data-act="draftsOnly">' + drafts.length + ' مسودة</a> مش مرحّلة.</p>' : '') + (ub.length ? '<p>🧾 ' + ub.length + ' فاتورة غير مدفوعة بمجموع ' + fmt(ub.reduce((s, b) => s + b.rem, 0)) + ' — <a href="#/expenses">عرض</a></p>' : '') +
+  h += '<div class="card"><h3>تنبيهات</h3>' + (drafts.length ? '<p>📝 في <a href="#/txns" data-act="draftsOnly">' + drafts.length + ' مسودة</a> غير مرحّلة.</p>' : '') + (ub.length ? '<p>🧾 ' + ub.length + ' فاتورة غير مدفوعة بمجموع ' + fmt(ub.reduce((s, b) => s + b.rem, 0)) + ' — <a href="#/expenses">عرض</a></p>' : '') +
     (L.warnings.length ? '<div class="warns"><b>' + L.warnings.length + ' تحذير:</b><br>' + L.warnings.slice(-6).map((w) => esc(fdate(w.date) + ' · ' + w.msg)).join('<br>') + (L.warnings.length > 6 ? '<br><a href="#/reports" data-act="openRep" data-arg="warnings">عرض الكل</a>' : '') + '</div>' : '') +
-    (!drafts.length && !ub.length && !L.warnings.length ? '<p class="mut">كل شي تمام ✓</p>' : '') + '</div></div>';
+    (!drafts.length && !ub.length && !L.warnings.length ? '<p class="mut">لا توجد تنبيهات ✓</p>' : '') + '</div></div>';
   const last = E.sortTx(A.st.txns).reverse().slice(0, 8);
-  h += '<div class="card"><h3>آخر العمليات</h3>' + table(['التاريخ', 'النوع', 'المرجع', 'التفاصيل', 'المبلغ', 'الحالة'], last.map(txRow), null, { num: [4], empty: 'ما في عمليات لسا' }) + '</div>';
+  h += '<div class="card"><h3>آخر القيود</h3>' + table(['التاريخ', 'النوع', 'المرجع', 'التفاصيل', 'المبلغ', 'الحالة'], last.map(txRow), null, { num: [4], empty: 'لا توجد قيود بعد' }) + '</div>';
   v.innerHTML = h;
 };
 A.actions.draftsOnly = () => { A.f.tx = Object.assign(A.f.tx || {}, { status: 'draft' }); go('txns'); };
@@ -1240,8 +1240,8 @@ PAGES.txns = (v) => {
   list = E.sortTx(list).reverse();
   const shown = list.slice(0, 300);
   v.innerHTML = '<div class="card"><div class="fg"><div class="f"><label>النوع</label><select id="fT"><option value="">الكل</option>' + Object.keys(E.TYPES).map((k) => opt(k, E.TYPES[k], f.type)).join('') + '</select></div><div class="f"><label>الحالة</label><select id="fS">' + opt('', 'الكل', f.status) + opt('posted', 'مرحّلة', f.status) + opt('draft', 'مسودات', f.status) + opt('void', 'ملغاة', f.status) + '</select></div>' +
-    '<div class="f"><label>من</label><input type="date" id="fF" value="' + f.from + '"></div><div class="f"><label>إلى</label><input type="date" id="fTo" value="' + f.to + '"></div><div class="f"><label>بحث (رقم، باركود، تاجر…)</label><input id="fQ" value="' + esc(f.q) + '"></div></div></div>' +
-    '<div class="card"><div class="row" style="margin-bottom:8px"><b>' + list.length + ' عملية</b>' + (list.length > 300 ? '<span class="mut">(أول 300)</span>' : '') + '<span style="flex:1"></span><button class="btn p" data-act="go" data-arg="new">＋ عملية جديدة</button></div>' +
+    '<div class="f"><label>من</label><input type="date" id="fF" value="' + f.from + '"></div><div class="f"><label>إلى</label><input type="date" id="fTo" value="' + f.to + '"></div><div class="f"><label>بحث (رقم، باركود، مورد…)</label><input id="fQ" value="' + esc(f.q) + '"></div></div></div>' +
+    '<div class="card"><div class="row" style="margin-bottom:8px"><b>' + list.length + ' قيد</b>' + (list.length > 300 ? '<span class="mut">(أول 300)</span>' : '') + '<span style="flex:1"></span><button class="btn p" data-act="go" data-arg="new">＋ قيد جديد</button></div>' +
     table(['التاريخ', 'النوع', 'المرجع', 'التفاصيل', 'المبلغ', 'الحالة'], shown.map(txRow), null, { num: [4] }) + '</div>';
   const bind = (id, k, ev) => { $(id).addEventListener(ev || 'change', (e) => { f[k] = e.target.value; render(); if (ev === 'input') { const el = $(id); el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }); };
   bind('#fT', 'type'); bind('#fS', 'status'); bind('#fF', 'from'); bind('#fTo', 'to'); bind('#fQ', 'q', 'input');
@@ -1265,10 +1265,10 @@ PAGES.stock = (v) => {
     r._act = ['itemCard', i.id]; return r;
   });
   const n = ls.length;
-  v.innerHTML = '<div class="card"><div class="row"><button class="btn p" data-act="newItem">＋ صنف</button><button class="btn b" data-act="impItems">استيراد أصناف Excel</button><button class="btn" data-act="new" data-arg="transfer">نقل بضاعة</button><button class="btn" data-act="new" data-arg="count">جرد</button><button class="btn b" data-act="impCount">استيراد جرد Excel</button><button class="btn" data-act="new" data-arg="ostock">مخزون افتتاحي</button><button class="btn" data-act="bulkLoc">طابق افتراضي حسب التصنيف</button></div></div>' +
+  v.innerHTML = '<div class="card"><div class="row"><button class="btn p" data-act="newItem">＋ صنف</button><button class="btn b" data-act="impItems">استيراد أصناف Excel</button><button class="btn" data-act="new" data-arg="transfer">تحويل مخزني</button><button class="btn" data-act="new" data-arg="count">جرد</button><button class="btn b" data-act="impCount">استيراد جرد Excel</button><button class="btn" data-act="new" data-arg="ostock">مخزون أول المدة</button><button class="btn" data-act="bulkLoc">طابق افتراضي حسب التصنيف</button></div></div>' +
     '<div class="card"><div class="fg"><div class="f"><label>بحث</label><input id="sQ" value="' + esc(f.q) + '" placeholder="باركود أو اسم"></div><div class="f"><label>التصنيف</label><select id="sC"><option value="">الكل</option>' + catsList.map((c) => opt(c, c, f.cat)).join('') + '</select></div><div class="f"><label>موجود في</label><select id="sL"><option value="">أي موقع</option>' + locs().map((l) => opt(l.id, l.name, f.loc)).join('') + '</select></div><div class="f" style="justify-content:end"><label><input type="checkbox" id="sZ" ' + (f.zero ? 'checked' : '') + '> إظهار الموقوفة</label></div></div></div>' +
     '<div class="card"><div class="row" style="margin-bottom:8px"><b>' + items.length + ' صنف</b><span class="mut">· اضغط على الصنف لكرت الحركة</span></div>' +
-    table(['الباركود', 'الصنف', 'التصنيف', ...ls.map((l) => esc(l.name)), 'المجموع', 'متوسط التكلفة', 'القيمة', 'سعر البيع'], rows, ['', 'المجموع', '', ...ls.map((l) => fq(tot[l.id] || 0)), fq(tq), '', fmt(tv), ''], { num: Array.from({ length: n + 4 }, (_, k) => k + 3), maxH: 620, empty: 'ما في أصناف — استورد ملف الأصناف أو أضف صنف' }) + '</div>';
+    table(['الباركود', 'الصنف', 'التصنيف', ...ls.map((l) => esc(l.name)), 'المجموع', 'متوسط التكلفة', 'القيمة', 'سعر البيع'], rows, ['', 'المجموع', '', ...ls.map((l) => fq(tot[l.id] || 0)), fq(tq), '', fmt(tv), ''], { num: Array.from({ length: n + 4 }, (_, k) => k + 3), maxH: 620, empty: 'لا يوجد أصناف — استورد ملف الأصناف أو أضف صنف' }) + '</div>';
   $('#sQ').addEventListener('input', (e) => { f.q = e.target.value; render(); const el = $('#sQ'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); });
   $('#sC').onchange = (e) => { f.cat = e.target.value; render(); }; $('#sL').onchange = (e) => { f.loc = e.target.value; render(); }; $('#sZ').onchange = (e) => { f.zero = e.target.checked; render(); };
 };
@@ -1279,37 +1279,37 @@ A.actions.itemCard = (id) => {
   const sold = A.L.saleLines.filter((l) => l.itemId === id);
   const m = modal('<h2>' + esc(it.name) + ' · ' + esc(it.barcode) + '</h2><div class="kpis">' + locs().map((l) => '<div class="kpi"><span>' + esc(l.name) + '</span><b>' + fq(s.loc[l.id] || 0) + '</b></div>').join('') + '<div class="kpi"><span>المجموع</span><b>' + fq(s.qty) + '</b></div><div class="kpi"><span>متوسط التكلفة</span><b>' + fmt(s.avg) + '</b></div><div class="kpi"><span>المباع (كل الفترة)</span><b>' + fq(sold.reduce((a, l) => a + l.qty, 0)) + '</b></div><div class="kpi"><span>ربح المباع</span><b>' + fmt(sold.reduce((a, l) => a + l.profit, 0)) + '</b></div></div>' +
     '<div class="row" style="margin-bottom:10px"><button class="btn" id="icEdit">تعديل الصنف</button></div>' +
-    table(['التاريخ', 'العملية', 'المرجع', 'الموقع', 'الكمية', 'الرصيد بالموقع'], mv.map((x) => { const r = [fdate(x.date), esc(E.TYPES[x.type]), esc(x.ref), esc(locName(x.locId)), '<span class="' + (x.qty < 0 ? 'neg' : 'pos') + '">' + (x.qty > 0 ? '+' : '') + fq(x.qty) + '</span>', fq(x.bal)]; r._id = x.id; return r; }), null, { num: [4, 5], empty: 'ما في حركة' }));
+    table(['التاريخ', 'المستند', 'المرجع', 'الموقع', 'الكمية', 'الرصيد بالموقع'], mv.map((x) => { const r = [fdate(x.date), esc(E.TYPES[x.type]), esc(x.ref), esc(locName(x.locId)), '<span class="' + (x.qty < 0 ? 'neg' : 'pos') + '">' + (x.qty > 0 ? '+' : '') + fq(x.qty) + '</span>', fq(x.bal)]; r._id = x.id; return r; }), null, { num: [4, 5], empty: 'لا توجد حركة' }));
   m.querySelector('#icEdit').onclick = () => { closeModal(m); editItem(it); };
 };
 A.actions.bulkLoc = () => {
   const catsList = Array.from(new Set(A.st.items.map((i) => i.cat || '(بدون تصنيف)'))).sort();
-  const m = modal('<h2>طابق البيع الافتراضي حسب التصنيف</h2><p class="mut">لما تستورد مبيعات «حسب طابق الصنف»، كل صنف بينخصم من طابقه.</p>' + catsList.map((c, i) => '<div class="row" style="margin-bottom:6px"><span style="flex:1">' + esc(c) + ' <span class="mut">(' + A.st.items.filter((x) => (x.cat || '(بدون تصنيف)') === c).length + ')</span></span><select data-c="' + i + '" style="width:auto"><option value="">بدون تغيير</option>' + locs().map((l) => opt(l.id, l.name)).join('') + '</select></div>').join('') + '<div class="row end"><button class="btn p" id="blGo">تطبيق</button></div>', { small: true });
+  const m = modal('<h2>طابق البيع الافتراضي حسب التصنيف</h2><p class="mut">عند استيراد المبيعات «حسب طابق الصنف» يُخصم كل صنف من طابقه.</p>' + catsList.map((c, i) => '<div class="row" style="margin-bottom:6px"><span style="flex:1">' + esc(c) + ' <span class="mut">(' + A.st.items.filter((x) => (x.cat || '(بدون تصنيف)') === c).length + ')</span></span><select data-c="' + i + '" style="width:auto"><option value="">بدون تغيير</option>' + locs().map((l) => opt(l.id, l.name)).join('') + '</select></div>').join('') + '<div class="row end"><button class="btn p" id="blGo">تطبيق</button></div>', { small: true });
   m.querySelector('#blGo').onclick = async () => {
     let n = 0;
     for (const s of $$('select[data-c]', m)) { if (!s.value) continue; const c = catsList[+s.dataset.c]; for (const it of A.st.items.filter((x) => (x.cat || '(بدون تصنيف)') === c && x.loc !== s.value)) { it.loc = s.value; await put('items', it); n++; } }
-    audit('تحديد طابق افتراضي للأصناف', n + ' صنف'); closeModal(m); toast('اتحدّث ' + n + ' صنف', 'ok');
+    audit('تحديد طابق افتراضي للأصناف', n + ' صنف'); closeModal(m); toast('تم تحديث ' + n + ' صنف', 'ok');
   };
 };
 
-/* ---- التجار ---- */
+/* ---- الموردون ---- */
 PAGES.suppliers = (v) => {
   const bal = E.partyBalances(A.L, E.ACC.ap);
   const pl = {}; A.L.purchLines.forEach((l) => (pl[l.supplierId] = r3((pl[l.supplierId] || 0) + l.value)));
   const rows = A.st.suppliers.slice().sort((a, b) => a.name.localeCompare(b.name, 'ar')).map((s) => { const r = [esc(s.name) + (s.active === false ? ' <span class="pill">موقوف</span>' : ''), esc(s.phone || ''), fmt(pl[s.id] || 0), money(-(bal[s.id] || 0))]; r._act = ['supCard', s.id]; return r; });
   const tb = r3(Object.values(bal).reduce((a, x) => a - x, 0));
-  v.innerHTML = '<div class="card"><div class="row"><button class="btn p" data-act="newSup">＋ تاجر</button><button class="btn" data-act="new" data-arg="purchase">فاتورة شراء</button><button class="btn" data-act="new" data-arg="spay">دفعة لتاجر</button></div></div><div class="card">' +
-    table(['التاجر', 'الهاتف', 'مجموع المشتريات', 'الرصيد المستحق له'], rows, ['المجموع', '', fmt(Object.values(pl).reduce((a, x) => a + x, 0)), fmt(tb)], { num: [2, 3], empty: 'ما في تجار' }) + '</div>';
+  v.innerHTML = '<div class="card"><div class="row"><button class="btn p" data-act="newSup">＋ مورد</button><button class="btn" data-act="new" data-arg="purchase">فاتورة شراء</button><button class="btn" data-act="new" data-arg="spay">سند صرف لمورد</button></div></div><div class="card">' +
+    table(['المورد', 'الهاتف', 'مجموع المشتريات', 'الرصيد الدائن'], rows, ['المجموع', '', fmt(Object.values(pl).reduce((a, x) => a + x, 0)), fmt(tb)], { num: [2, 3], empty: 'لا يوجد تجار' }) + '</div>';
 };
 A.actions.newSup = () => editSupplier({});
 A.actions.supCard = (id) => {
   const s = A.st.suppliers.find((x) => x.id === id);
   const stt = E.partyStatement(A.L, E.ACC.ap, id);
-  const m = modal('<h2>كشف حساب: ' + esc(s.name) + '</h2><div class="row" style="margin-bottom:10px"><button class="btn" id="scE">تعديل</button><button class="btn" id="scPay">دفعة</button><button class="btn b" id="scX">Excel</button><span style="flex:1"></span><b>الرصيد المستحق له: ' + fmt(-stt.closing) + '</b></div>' +
-    table(['التاريخ', 'العملية', 'المرجع', 'له (فواتير)', 'دفعنا', 'الرصيد'], stt.rows.map((l) => { const r = [fdate(l.date), esc(E.TYPES[l.type]), esc(l.ref), l.cr ? fmt(l.cr) : '', l.dr ? fmt(l.dr) : '', fmt(-l.bal)]; r._id = l.id; return r; }), null, { num: [3, 4, 5], empty: 'ما في حركة' }));
+  const m = modal('<h2>كشف حساب: ' + esc(s.name) + '</h2><div class="row" style="margin-bottom:10px"><button class="btn" id="scE">تعديل</button><button class="btn" id="scPay">دفعة</button><button class="btn b" id="scX">Excel</button><span style="flex:1"></span><b>الرصيد الدائن: ' + fmt(-stt.closing) + '</b></div>' +
+    table(['التاريخ', 'المستند', 'المرجع', 'دائن', 'مدين', 'الرصيد'], stt.rows.map((l) => { const r = [fdate(l.date), esc(E.TYPES[l.type]), esc(l.ref), l.cr ? fmt(l.cr) : '', l.dr ? fmt(l.dr) : '', fmt(-l.bal)]; r._id = l.id; return r; }), null, { num: [3, 4, 5], empty: 'لا توجد حركة' }));
   m.querySelector('#scE').onclick = () => { closeModal(m); editSupplier(s); };
   m.querySelector('#scPay').onclick = () => { closeModal(m); openTx(newTx('spay', { supplierId: id })); };
-  m.querySelector('#scX').onclick = () => exportXlsx('كشف ' + s.name, [{ name: 'كشف حساب', head: ['التاريخ', 'العملية', 'المرجع', 'له', 'دفعنا', 'الرصيد'], rows: stt.rows.map((l) => [l.date, E.TYPES[l.type], l.ref, l.cr, l.dr, -l.bal]), sum: [3, 4] }]);
+  m.querySelector('#scX').onclick = () => exportXlsx('كشف ' + s.name, [{ name: 'كشف حساب', head: ['التاريخ', 'المستند', 'المرجع', 'دائن', 'مدين', 'الرصيد'], rows: stt.rows.map((l) => [l.date, E.TYPES[l.type], l.ref, l.cr, l.dr, -l.bal]), sum: [3, 4] }]);
 };
 
 /* ---- الموظفين والرواتب ---- */
@@ -1322,13 +1322,13 @@ PAGES.staff = (v) => {
     const rowsOf = (list) => list.map((e) => { const r = [esc(e.code || ''), esc(e.name), esc(e.job || ''), fmt(e.salary), fdate(e.hireDate), e.endDate ? fdate(e.endDate) : '', fmt(rem(e.id)), e.active !== false ? '<button class="btn sm" data-act="editEmp" data-arg="' + e.id + '">تعديل</button> <button class="btn sm d" data-act="termEmp" data-arg="' + e.id + '">إنهاء عمل</button>' : '<button class="btn sm" data-act="rehire" data-arg="' + e.id + '">إرجاع</button>']; return r; });
     const act = A.st.employees.filter((e) => e.active !== false), ina = A.st.employees.filter((e) => e.active === false);
     h += '<div class="card"><div class="row"><button class="btn p" data-act="newEmp">＋ موظف</button><button class="btn" data-act="new" data-arg="advance">سلفة</button></div></div><div class="card"><h3>على رأس عمله (' + act.length + ')</h3>' +
-      table(['الرقم', 'الاسم', 'الوظيفة', 'الراتب', 'التعيين', 'انتهاء', 'سلف باقية', ''], rowsOf(act), ['', '', 'المجموع', fmt(act.reduce((s, e) => s + num(e.salary), 0)), '', '', '', ''], { num: [3, 6], empty: 'ما في موظفين' }) + '</div>' +
+      table(['الرقم', 'الاسم', 'الوظيفة', 'الراتب', 'التعيين', 'انتهاء', 'سلف باقية', ''], rowsOf(act), ['', '', 'المجموع', fmt(act.reduce((s, e) => s + num(e.salary), 0)), '', '', '', ''], { num: [3, 6], empty: 'لا يوجد موظفين' }) + '</div>' +
       (ina.length ? '<div class="card"><h3>انتهى عملهم (' + ina.length + ')</h3>' + table(['الرقم', 'الاسم', 'الوظيفة', 'الراتب', 'التعيين', 'انتهاء', 'سلف باقية', ''], rowsOf(ina), null, { num: [3, 6] }) + '</div>' : '');
   } else if (tab === 'pay') h += payrollPage();
   else {
     const advs = E.advances(A.st).filter((a) => !a.over);
     const rows = advs.slice().reverse().map((a) => { const r = [fdate(a.date), esc(empName(a.empId)), fmt(a.amount), a.mode === 'inst' ? a.count + ' أقساط × ' + fmt(a.inst) : 'كاملة', fmonth(a.start), fmt(a.paid), '<b>' + fmt(a.remaining) + '</b>', a.remaining > 0 ? '<span class="pill warn">مفتوحة</span>' : '<span class="pill ok">مسددة</span>']; r._id = a.id; return r; });
-    h += '<div class="card"><div class="row"><button class="btn p" data-act="new" data-arg="advance">＋ سلفة</button><button class="btn" data-act="new" data-arg="advpay">سداد نقدي</button></div></div><div class="card">' + table(['التاريخ', 'الموظف', 'المبلغ', 'الخصم', 'أول شهر', 'المخصوم', 'الباقي', 'الحالة'], rows, ['', 'المجموع', fmt(advs.reduce((s, a) => s + a.amount, 0)), '', '', fmt(advs.reduce((s, a) => s + a.paid, 0)), fmt(advs.reduce((s, a) => s + a.remaining, 0)), ''], { num: [2, 5, 6], empty: 'ما في سلف' }) + '</div>';
+    h += '<div class="card"><div class="row"><button class="btn p" data-act="new" data-arg="advance">＋ سلفة</button><button class="btn" data-act="new" data-arg="advpay">سداد نقدي</button></div></div><div class="card">' + table(['التاريخ', 'الموظف', 'المبلغ', 'الخصم', 'أول شهر', 'المخصوم', 'الباقي', 'الحالة'], rows, ['', 'المجموع', fmt(advs.reduce((s, a) => s + a.amount, 0)), '', '', fmt(advs.reduce((s, a) => s + a.paid, 0)), fmt(advs.reduce((s, a) => s + a.remaining, 0)), ''], { num: [2, 5, 6], empty: 'لا يوجد سلف' }) + '</div>';
   }
   v.innerHTML = h;
   if (tab === 'pay') bindPayroll();
@@ -1368,10 +1368,10 @@ function payrollPage() {
     return '<tr><td>' + esc(e.name) + (part ? ' <span class="pill warn" title="جزء من الشهر">جزئي</span>' : '') + '</td><td>' + cell(e.id, 'base', r.base) + '</td><td>' + cell(e.id, 'absDays', r.absDays) + '</td><td>' + cell(e.id, 'absDed', r.absDed) + '</td><td>' + cell(e.id, 'lateMin', r.lateMin) + '</td><td>' + cell(e.id, 'lateDed', r.lateDed) + '</td><td>' + cell(e.id, 'otherDed', r.otherDed) + '</td><td>' + cell(e.id, 'bonus', r.bonus) + '</td><td>' + cell(e.id, 'advDed', r.advDed) + (due ? '<div class="mut" style="font-size:11px">مستحق ' + fmt(due) + '</div>' : '') + '</td><td class="n"><b class="' + (c.net < 0 ? 'neg' : '') + '">' + fmt(c.net) + '</b></td><td><input type="checkbox" data-pc="' + e.id + '" checked></td></tr>';
   }).join('');
   const pending = rows.filter((x) => !x.p).length;
-  return '<div class="card"><div class="fg"><div class="f"><label>الشهر</label><input type="month" id="pM" value="' + f.month + '"></div><div class="f"><label>تاريخ الدفع</label><input type="date" id="pD" value="' + f.date + '"></div><div class="f"><label>الدفع من</label><select id="pP">' + payOpts(f.pay) + '</select></div>' +
-    '<div class="f"><label>ملف الدوام (Excel)</label><label class="btn b">استيراد من تطبيق الدوام<input type="file" id="pAtt" accept="' + XL_ACCEPT + '" hidden></label><span class="h">' + (A.f.att && A.f.att.month === f.month ? '✓ انقرأ ' + A.f.att.file + ' — ' + Object.keys(A.f.att.map).length + ' موظف' : 'بيقرأ ورقة «ملخص الموظفين»: الغياب والتأخير') + '</span></div></div>' +
-    '<p class="mut" style="font-size:12.5px;margin:8px 0 0">خصم يوم الغياب = الراتب ÷ 30. خصم التأخير ' + (A.st.cfg.lateDeduct ? '= قيمة الدقيقة (الراتب ÷ 30 ÷ ' + (A.st.cfg.dayHours || 8) + ' ساعات ÷ 60)' : 'متوقف من الإعدادات') + '. السلف المستحقة بتنحسب تلقائياً (كاملة أو قسط الشهر). كل الأرقام قابلة للتعديل قبل الترحيل.</p></div>' +
-    '<div class="card"><div class="tw"><table class="lines"><thead><tr><th>الموظف</th><th>الأساسي</th><th>أيام غياب</th><th>خصم غياب</th><th>د. تأخير</th><th>خصم تأخير</th><th>خصومات أخرى</th><th>مكافأة</th><th>خصم سلف</th><th class="n">الصافي</th><th></th></tr></thead><tbody>' + (body || '<tr><td colspan="11" class="empty">ما في موظفين بهالشهر</td></tr>') + '</tbody><tfoot><tr><td>المجموع</td><td colspan="7" class="mut">الرواتب بعد الخصومات (مصروف): ' + fmt(tg) + '</td><td class="n">' + fmt(ta) + '</td><td class="n">' + fmt(tn) + '</td><td></td></tr></tfoot></table></div>' +
+  return '<div class="card"><div class="fg"><div class="f"><label>الشهر</label><input type="month" id="pM" value="' + f.month + '"></div><div class="f"><label>تاريخ الصرف</label><input type="date" id="pD" value="' + f.date + '"></div><div class="f"><label>الصرف من</label><select id="pP">' + payOpts(f.pay) + '</select></div>' +
+    '<div class="f"><label>ملف الدوام (Excel)</label><label class="btn b">استيراد من تطبيق الدوام<input type="file" id="pAtt" accept="' + XL_ACCEPT + '" hidden></label><span class="h">' + (A.f.att && A.f.att.month === f.month ? '✓ تمت قراءة ' + A.f.att.file + ' — ' + Object.keys(A.f.att.map).length + ' موظف' : 'يقرأ ورقة «ملخص الموظفين»: الغياب والتأخير') + '</span></div></div>' +
+    '<p class="mut" style="font-size:12.5px;margin:8px 0 0">خصم يوم الغياب = الراتب ÷ 30. خصم التأخير ' + (A.st.cfg.lateDeduct ? '= قيمة الدقيقة (الراتب ÷ 30 ÷ ' + (A.st.cfg.dayHours || 8) + ' ساعات ÷ 60)' : 'متوقف من الإعدادات') + '. تُحتسب السلف المستحقة تلقائياً (كاملة أو قسط الشهر). جميع المبالغ قابلة للتعديل قبل الترحيل.</p></div>' +
+    '<div class="card"><div class="tw"><table class="lines"><thead><tr><th>الموظف</th><th>الأساسي</th><th>أيام غياب</th><th>خصم غياب</th><th>د. تأخير</th><th>خصم تأخير</th><th>خصومات أخرى</th><th>مكافأة</th><th>خصم سلف</th><th class="n">الصافي</th><th></th></tr></thead><tbody>' + (body || '<tr><td colspan="11" class="empty">لا يوجد موظفون في هذا الشهر</td></tr>') + '</tbody><tfoot><tr><td>المجموع</td><td colspan="7" class="mut">الرواتب بعد الخصومات (مصروف): ' + fmt(tg) + '</td><td class="n">' + fmt(ta) + '</td><td class="n">' + fmt(tn) + '</td><td></td></tr></tfoot></table></div>' +
     '<div class="row end" style="margin-top:12px"><button class="btn b" data-act="payXl">Excel</button><button class="btn p" id="pGo" ' + (pending ? '' : 'disabled') + '>ترحيل رواتب المحددين (' + pending + ')</button></div></div>';
 }
 function bindPayroll() {
@@ -1393,7 +1393,7 @@ function bindPayroll() {
     if (errs.length) return toast(errs.slice(0, 3).join(' · '), 'err', 7000);
     if (!(await confirmBox('ترحيل الرواتب', docs.length + ' موظف · صافي ' + fmt(docs.reduce((s, d) => s + E.payrollCalc(d).net, 0)) + ' من ' + E.PAY_NAMES[f.pay] + ' بتاريخ ' + fdate(f.date), 'رحّل'))) return;
     for (const d of docs) await put('txns', d);
-    audit('ترحيل رواتب ' + f.month, docs.length + ' موظف'); A.f.payEdits = null; toast('انرحّلت رواتب ' + docs.length + ' موظف', 'ok');
+    audit('ترحيل رواتب ' + f.month, docs.length + ' موظف'); A.f.payEdits = null; toast('تم ترحيل رواتب ' + docs.length + ' موظف', 'ok');
   };
 }
 A.actions.payXl = () => {
@@ -1402,17 +1402,17 @@ A.actions.payXl = () => {
     rows: rows.map(({ e, p, r }) => { const x = p || r; return [e.name, e.code || '', num(x.base), num(x.absDays), num(x.absDed), num(x.lateMin), num(x.lateDed), num(x.otherDed), num(x.bonus), num(x.advDed), E.payrollCalc(x).net, p ? 'مدفوع' : 'غير مرحّل']; }), sum: [2, 4, 6, 7, 8, 9, 10] }]);
 };
 
-/* ---- المصاريف ---- */
+/* ---- المصروفات ---- */
 PAGES.expenses = (v) => {
   const f = A.f.ex = A.f.ex || {};
-  let h = '<div class="card"><div class="row"><button class="btn p" data-act="new" data-arg="expense">＋ مصروف / فاتورة</button><button class="btn" data-act="new" data-arg="billpay">تسديد فاتورة</button><button class="btn" data-act="go" data-arg="settings">بنود المصاريف</button></div></div>';
+  let h = '<div class="card"><div class="row"><button class="btn p" data-act="new" data-arg="expense">＋ قيد مصروف</button><button class="btn" data-act="new" data-arg="billpay">سداد مصروف مستحق</button><button class="btn" data-act="go" data-arg="settings">بنود المصروفات</button></div></div>';
   const ub = unpaidBills();
-  h += '<div class="card"><h3>فواتير غير مدفوعة (' + ub.length + ')</h3>' + table(['التاريخ', 'البند', 'رقم الفاتورة', 'الفترة', 'المبلغ', 'المدفوع', 'الباقي', ''], ub.map((b) => [fdate(b.t.date), esc(catName(b.t.catId)), esc(b.t.ref || ''), b.t.billFrom ? fdate(b.t.billFrom) + '—' + fdate(b.t.billTo) : '', fmt(b.t.amount), fmt(b.paid), '<b>' + fmt(b.rem) + '</b>', '<button class="btn sm b" data-act="payBill" data-arg="' + b.t.id + '">تسديد</button>']), null, { num: [4, 5, 6], empty: 'ما في فواتير مستحقة ✓' }) + '</div>';
+  h += '<div class="card"><h3>مصروفات مستحقة غير مسددة (' + ub.length + ')</h3>' + table(['التاريخ', 'البند', 'رقم الفاتورة', 'الفترة', 'المبلغ', 'المدفوع', 'الباقي', ''], ub.map((b) => [fdate(b.t.date), esc(catName(b.t.catId)), esc(b.t.ref || ''), b.t.billFrom ? fdate(b.t.billFrom) + '—' + fdate(b.t.billTo) : '', fmt(b.t.amount), fmt(b.paid), '<b>' + fmt(b.rem) + '</b>', '<button class="btn sm b" data-act="payBill" data-arg="' + b.t.id + '">تسديد</button>']), null, { num: [4, 5, 6], empty: 'لا يوجد فواتير مستحقة ✓' }) + '</div>';
   const fixed = A.st.txns.filter((t) => t.status === 'posted' && t.type === 'expense' && t.spread);
-  h += '<div class="card"><h3>المصاريف الثابتة الموزّعة</h3>' + table(['التاريخ', 'البند', 'البيان', 'المبلغ', 'التوزيع', 'عدد الأشهر', 'حصة الشهر'], fixed.map((t) => { const n = E.monthsBetween(t.spread.from, t.spread.to).length; const r = [fdate(t.date), esc(catName(t.catId)), esc(t.desc || ''), fmt(t.amount), fmonth(t.spread.from) + ' ← ' + fmonth(t.spread.to), n, fmt(num(t.amount) / n)]; r._id = t.id; return r; }), null, { num: [3, 5, 6], empty: 'ما في مصاريف موزّعة. لما تسجل مصروف (مثل الإيجار السنوي) اختار «مصروف ثابت» عشان يتوزع على السنة أو الموسم.' }) + '</div>';
-  h += '<div class="card"><h3>المصاريف</h3>' + periodBar('exP');
+  h += '<div class="card"><h3>المصروفات الثابتة الموزعة</h3>' + table(['التاريخ', 'البند', 'البيان', 'المبلغ', 'التوزيع', 'عدد الأشهر', 'حصة الشهر'], fixed.map((t) => { const n = E.monthsBetween(t.spread.from, t.spread.to).length; const r = [fdate(t.date), esc(catName(t.catId)), esc(t.desc || ''), fmt(t.amount), fmonth(t.spread.from) + ' ← ' + fmonth(t.spread.to), n, fmt(num(t.amount) / n)]; r._id = t.id; return r; }), null, { num: [3, 5, 6], empty: 'لا توجد مصروفات موزعة. عند تسجيل مصروف مثل الإيجار السنوي اختر «مصروف ثابت» لتوزيعه على السنة أو الموسم.' }) + '</div>';
+  h += '<div class="card"><h3>المصروفات</h3>' + periodBar('exP');
   const p = A.f.exP; const list = E.sortTx(A.st.txns.filter((t) => t.status === 'posted' && t.type === 'expense' && t.date >= p.from && t.date <= p.to)).reverse();
-  h += table(['التاريخ', 'البند', 'البيان', 'رقم', 'الدفع', 'المبلغ'], list.map((t) => { const r = [fdate(t.date), esc(catName(t.catId)), esc(t.desc || '') + (t.spread ? ' <span class="pill">موزّع</span>' : ''), esc(t.ref || ''), E.PAY_NAMES[t.pay], fmt(t.amount)]; r._id = t.id; return r; }), ['', 'المجموع', '', '', '', fmt(list.reduce((s, t) => s + num(t.amount), 0))], { num: [5] }) + '<p class="mut" style="font-size:12.5px">هاي المبالغ حسب تاريخ الدفع. تقرير «المصاريف» بالتقارير بيعرضها حسب الاستحقاق (مع توزيع الثابتة) ويومي/شهري/سنوي.</p></div>';
+  h += table(['التاريخ', 'البند', 'البيان', 'رقم', 'الدفع', 'المبلغ'], list.map((t) => { const r = [fdate(t.date), esc(catName(t.catId)), esc(t.desc || '') + (t.spread ? ' <span class="pill">موزّع</span>' : ''), esc(t.ref || ''), E.PAY_NAMES[t.pay], fmt(t.amount)]; r._id = t.id; return r; }), ['', 'المجموع', '', '', '', fmt(list.reduce((s, t) => s + num(t.amount), 0))], { num: [5] }) + '<p class="mut" style="font-size:12.5px">المبالغ أعلاه حسب تاريخ الدفع. يعرضها تقرير «المصروفات» على أساس الاستحقاق (مع توزيع الثابتة) يومياً وشهرياً وسنوياً.</p></div>';
   v.innerHTML = h;
 };
 A.actions.payBill = (id) => { const b = unpaidBills().find((x) => x.t.id === id); openTx(newTx('billpay', { expenseId: id, amount: b ? b.rem : '' })); };
@@ -1421,23 +1421,23 @@ A.actions.payBill = (id) => { const b = unpaidBills().find((x) => x.t.id === id)
 PAGES.settings = (v) => {
   const c = A.st.cfg;
   let h = '<div class="card"><h3>بيانات المحل</h3><div class="fg">' + fld('اسم المحل', '<input id="cfN" value="' + esc(c.shopName) + '">') + fld('تاريخ بدء النظام', '<input type="date" id="cfS" value="' + esc(c.startDate) + '">') +
-    fld('إقفال الفترة حتى', '<input type="date" id="cfL" value="' + esc(c.lockDate || '') + '">', 'ما بتقدر تضيف أو تلغي عمليات بتاريخ قبله') + fld('نسبة الضريبة %', '<input type="number" id="cfT" value="' + esc(c.taxRate) + '">', 'للتقرير بس — المبالغ بتنسجل كاملة') +
+    fld('إقفال الفترة حتى', '<input type="date" id="cfL" value="' + esc(c.lockDate || '') + '">', 'لا يمكن إضافة أو إلغاء قيود بتاريخ سابق له') + fld('نسبة الضريبة %', '<input type="number" id="cfT" value="' + esc(c.taxRate) + '">', 'للتقرير فقط — المبالغ تُسجّل شاملة الضريبة') +
     fld('ساعات الدوام اليومية', '<input type="number" id="cfH" value="' + esc(c.dayHours || 8) + '">') + fld('خصم التأخير من الراتب', '<select id="cfLD">' + opt('1', 'نعم', c.lateDeduct ? '1' : '0') + opt('0', 'لا', c.lateDeduct ? '1' : '0') + '</select>') +
     '</div><div class="row end" style="margin-top:10px"><button class="btn p" id="cfSave">حفظ</button></div></div>';
   h += '<div class="card"><h3>المواقع (الطوابق والمستودعات)</h3>' + table(['الموقع', 'النوع', 'القطع الموجودة', 'الحالة', ''], locs(true).map((l) => { let q = 0; Object.values(A.L.stock).forEach((s) => (q += s.loc[l.id] || 0)); return [esc(l.name), l.kind === 'floor' ? 'معرض (طابق)' : 'مستودع', fq(q), l.active !== false ? '<span class="pill ok">فعّال</span>' : '<span class="pill">موقوف</span>', '<button class="btn sm" data-act="editLoc" data-arg="' + l.id + '">تعديل</button>']; }), null, { num: [2] }) + '<div class="row" style="margin-top:8px"><button class="btn" data-act="editLoc">＋ موقع جديد</button></div></div>';
-  h += '<div class="card"><h3>بنود المصاريف</h3>' + table(['البند', 'الحالة', ''], cats(true).map((x) => [esc(x.name), x.active !== false ? '<span class="pill ok">فعّال</span>' : '<span class="pill">موقوف</span>', '<button class="btn sm" data-act="editCat" data-arg="' + x.id + '">تعديل</button>'])) + '<div class="row" style="margin-top:8px"><button class="btn" data-act="editCat">＋ بند جديد</button></div></div>';
-  h += '<div class="card"><h3>أرصدة افتتاحية</h3><p class="mut">أي شي قبل تاريخ البدء بيدخل هون بتاريخ البدء: الكاش والبنك، المخزون لكل موقع، ديون التجار (فاتورة شراء آجل)، السلف القديمة (سلفة بتاريخ البدء).</p><div class="row"><button class="btn" data-act="new" data-arg="opening">كاش وبنك</button><button class="btn" data-act="new" data-arg="ostock">مخزون افتتاحي</button><button class="btn b" data-act="impOstock">مخزون افتتاحي من Excel</button></div></div>';
+  h += '<div class="card"><h3>بنود المصروفات</h3>' + table(['البند', 'الحالة', ''], cats(true).map((x) => [esc(x.name), x.active !== false ? '<span class="pill ok">فعّال</span>' : '<span class="pill">موقوف</span>', '<button class="btn sm" data-act="editCat" data-arg="' + x.id + '">تعديل</button>'])) + '<div class="row" style="margin-top:8px"><button class="btn" data-act="editCat">＋ بند جديد</button></div></div>';
+  h += '<div class="card"><h3>أرصدة افتتاحية</h3><p class="mut">تُسجّل الأرصدة السابقة لتاريخ البدء بتاريخ البدء: الصندوق والبنك، مخزون أول المدة لكل موقع، الذمم الدائنة للموردين (فاتورة شراء آجلة)، والسلف القائمة (سلفة بتاريخ البدء).</p><div class="row"><button class="btn" data-act="new" data-arg="opening">الصندوق والبنك</button><button class="btn" data-act="new" data-arg="ostock">مخزون أول المدة</button><button class="btn b" data-act="impOstock">مخزون أول المدة من Excel</button></div></div>';
   h += '<div class="card"><h3>استيراد من Excel</h3><div class="row"><button class="btn b" data-act="impItems">أصناف</button><button class="btn b" data-act="impSales">مبيعات</button><button class="btn b" data-act="impPurch">فاتورة شراء</button><button class="btn b" data-act="impCount">جرد</button></div></div>';
-  h += '<div class="card"><h3>نسخة احتياطية</h3><p class="mut">' + (A.local ? 'البيانات محفوظة على هالجهاز (بالمتصفح). نزّل نسخة احتياطية بشكل دوري، أو فعّل المزامنة مع GitHub تحت.' : 'البيانات محفوظة على حسابك وما بتضيع لو سكّرت الصفحة.') + ' النسخة الاحتياطية ملف JSON فيه كل شي، وبتقدر ترجعه بأي وقت.</p><div class="row"><button class="btn p" data-act="backup">تنزيل نسخة احتياطية</button><label class="btn">استرجاع نسخة<input type="file" id="restore" accept=".json" hidden></label><button class="btn" data-act="auditLog">سجل التعديلات</button></div></div>';
-  h += '<div class="card"><h3>إنهاء التجربة والبدء الفعلي</h3><p class="mut">لما تخلص تجربة، بتمسح العمليات وبتحدد تاريخ البدء الحقيقي (مثلاً 1/11). بتختار إذا بدك تخلي الأصناف والتجار والموظفين.</p><button class="btn d" data-act="wipe">مسح بيانات التجربة…</button></div>';
+  h += '<div class="card"><h3>نسخة احتياطية</h3><p class="mut">' + (A.local ? 'البيانات محفوظة على هذا الجهاز (في المتصفح). يُنصح بتنزيل نسخة احتياطية دورياً أو تفعيل المزامنة مع GitHub أدناه.' : 'البيانات محفوظة على حسابك ولا تُفقد عند إغلاق الصفحة.') + ' النسخة الاحتياطية ملف JSON يتضمن جميع البيانات، ويمكن استرجاعه في أي وقت.</p><div class="row"><button class="btn p" data-act="backup">تنزيل نسخة احتياطية</button><label class="btn">استرجاع نسخة<input type="file" id="restore" accept=".json" hidden></label><button class="btn" data-act="auditLog">سجل التعديلات</button></div></div>';
+  h += '<div class="card"><h3>إنهاء التجربة والبدء الفعلي</h3><p class="mut">عند انتهاء التجربة تُمسح القيود ويُحدَّد تاريخ البدء الفعلي (مثلاً 1/11)، مع خيار الإبقاء على الأصناف والموردين والموظفين.</p><button class="btn d" data-act="wipe">مسح بيانات التجربة…</button></div>';
   if (A.local) h += syncCard();
-  if (A.demo) h += '<div class="card warns">وضع تجريبي: التخزين مش متاح بهاد العرض، والبيانات بتروح لما تسكّر الصفحة.</div>';
+  if (A.demo) h += '<div class="card warns">وضع تجريبي: التخزين غير متاح في هذا العرض، وتُفقد البيانات عند إغلاق الصفحة.</div>';
   v.innerHTML = h;
   $('#cfSave').onclick = async () => {
     const x = clone(c); Object.assign(x, { shopName: $('#cfN').value.trim() || 'PERFECT', startDate: $('#cfS').value, lockDate: $('#cfL').value, taxRate: num($('#cfT').value) || 16, dayHours: num($('#cfH').value) || 8, lateDeduct: $('#cfLD').value === '1' });
     const early = A.st.txns.filter((t) => t.status === 'posted' && t.date < x.startDate);
-    if (early.length) return toast('في ' + early.length + ' عملية قبل تاريخ البدء الجديد', 'err');
-    await saveCfg(x); audit('تعديل الإعدادات', 'بدء ' + x.startDate + ' · إقفال ' + (x.lockDate || '—') + ' · ضريبة ' + x.taxRate); toast('انحفظ', 'ok');
+    if (early.length) return toast('في ' + early.length + ' قيد قبل تاريخ البدء الجديد', 'err');
+    await saveCfg(x); audit('تعديل الإعدادات', 'بدء ' + x.startDate + ' · إقفال ' + (x.lockDate || '—') + ' · ضريبة ' + x.taxRate); toast('تم الحفظ', 'ok');
   };
   $('#restore').onchange = restoreBackup;
 };
@@ -1447,7 +1447,7 @@ A.actions.editLoc = async (id) => {
   m.querySelector('#lS').onclick = async () => {
     const n = m.querySelector('#lN').value.trim(); if (!n) return;
     const act = m.querySelector('#lA').value === '1';
-    if (!act) { let q = 0; Object.values(A.L.stock).forEach((s) => (q += s.loc[l.id] || 0)); if (q) return toast('الموقع فيه ' + fq(q) + ' قطعة — انقلهم أول', 'err'); }
+    if (!act) { let q = 0; Object.values(A.L.stock).forEach((s) => (q += s.loc[l.id] || 0)); if (q) return toast('الموقع فيه ' + fq(q) + ' قطعة — يجب تحويلها أولاً', 'err'); }
     const isNew = l._new; delete l._new; Object.assign(l, { name: n, kind: m.querySelector('#lK').value, active: act });
     if (isNew) c.locations.push(l); await saveCfg(c); audit(isNew ? 'إضافة موقع' : 'تعديل موقع', n); closeModal(m);
   };
@@ -1462,25 +1462,25 @@ A.actions.editCat = async (id) => {
   };
 };
 A.actions.auditLog = async () => {
-  const m = modal('<h2>سجل التعديلات</h2><div id="lg" class="empty">عم يحمّل…</div>');
+  const m = modal('<h2>سجل التعديلات</h2><div id="lg" class="empty">جارٍ التحميل…</div>');
   try {
     const q = await A.db.collection('log').get();
     const all = []; q.docs.forEach((d) => (d.data().entries || []).forEach((e) => all.push(e)));
     all.sort((a, b) => (a.at < b.at ? 1 : -1));
-    m.querySelector('#lg').outerHTML = table(['الوقت', 'العملية', 'التفاصيل'], all.slice(0, 500).map((e) => [esc(new Date(e.at).toLocaleString('en-GB')), esc(e.act), esc(e.detail)]), null, { empty: 'السجل فاضي' });
+    m.querySelector('#lg').outerHTML = table(['الوقت', 'المستند', 'التفاصيل'], all.slice(0, 500).map((e) => [esc(new Date(e.at).toLocaleString('en-GB')), esc(e.act), esc(e.detail)]), null, { empty: 'السجل فارغ' });
   } catch (e) { m.querySelector('#lg').textContent = 'ما قدرت أقرأ السجل'; }
 };
 A.actions.backup = async () => {
   const log = []; try { (await A.db.collection('log').get()).docs.forEach((d) => log.push(Object.assign({ id: d.id }, d.data()))); } catch (e) { /* */ }
   const data = { app: 'perfect-accounting-artifact', version: 1, at: nowIso(), cfg: A.st.cfg, items: A.st.items, suppliers: A.st.suppliers, employees: A.st.employees, txns: A.st.txns, log };
-  if (await saveFile('PERFECT-نسخة-' + today() + '.json', JSON.stringify(data))) audit('تنزيل نسخة احتياطية', A.st.txns.length + ' عملية');
+  if (await saveFile('PERFECT-نسخة-' + today() + '.json', JSON.stringify(data))) audit('تنزيل نسخة احتياطية', A.st.txns.length + ' قيد');
 };
 async function restoreBackup(e) {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-  let d; try { d = JSON.parse(await f.text()); } catch (x) { return toast('الملف مش نسخة صالحة', 'err'); }
-  if (d.app !== 'perfect-accounting-artifact' || !d.cfg) return toast('الملف مش نسخة من هالتطبيق', 'err');
-  if (!(await confirmBox('استرجاع نسخة', 'نسخة ' + (d.at || '').slice(0, 10) + ': ' + (d.txns || []).length + ' عملية، ' + (d.items || []).length + ' صنف. البيانات الحالية بنفس الأرقام رح تنكتب فوقها، والعمليات الجديدة اللي مش بالنسخة رح تنحذف.', 'استرجاع', true))) return;
-  toast('عم يسترجع…', '', 8000);
+  let d; try { d = JSON.parse(await f.text()); } catch (x) { return toast('الملف ليس نسخة احتياطية صالحة', 'err'); }
+  if (d.app !== 'perfect-accounting-artifact' || !d.cfg) return toast('الملف ليس نسخة احتياطية من هذا التطبيق', 'err');
+  if (!(await confirmBox('استرجاع نسخة', 'نسخة ' + (d.at || '').slice(0, 10) + ': ' + (d.txns || []).length + ' قيد، ' + (d.items || []).length + ' صنف. ستُستبدل البيانات الحالية بنفس المعرّفات، وستُحذف القيود غير الموجودة في النسخة.', 'استرجاع', true))) return;
+  toast('جارٍ الاسترجاع…', '', 8000);
   await saveCfg(d.cfg);
   for (const c of COLS) {
     const ids = new Set((d[c] || []).map((x) => x.id));
@@ -1493,16 +1493,16 @@ async function restoreBackup(e) {
 A.actions.wipe = async () => {
   const n = A.st.txns.length;
   const m = modal('<h2>مسح بيانات التجربة</h2><div class="fg">' + fld('تاريخ البدء الجديد', '<input type="date" id="wD" value="' + esc(A.st.cfg.startDate) + '">') + '</div>' +
-    '<div style="margin:10px 0"><label><input type="checkbox" checked disabled> كل العمليات (' + n + ')</label><br><label><input type="checkbox" id="wI"> الأصناف (' + A.st.items.length + ')</label><br><label><input type="checkbox" id="wS"> التجار (' + A.st.suppliers.length + ')</label><br><label><input type="checkbox" id="wE"> الموظفين (' + A.st.employees.length + ')</label></div>' +
-    '<div class="f"><label>للتأكيد اكتب: امسح</label><input id="wC"></div><p class="mut" style="font-size:13px">المسح نهائي. نزّل نسخة احتياطية قبل إذا بدك.</p><div class="row end"><button class="btn d" id="wGo">مسح</button></div>', { small: true });
+    '<div style="margin:10px 0"><label><input type="checkbox" checked disabled> كل القيود (' + n + ')</label><br><label><input type="checkbox" id="wI"> الأصناف (' + A.st.items.length + ')</label><br><label><input type="checkbox" id="wS"> الموردون (' + A.st.suppliers.length + ')</label><br><label><input type="checkbox" id="wE"> الموظفين (' + A.st.employees.length + ')</label></div>' +
+    '<div class="f"><label>للتأكيد اكتب: امسح</label><input id="wC"></div><p class="mut" style="font-size:13px">المسح نهائي. يُنصح بتنزيل نسخة احتياطية أولاً.</p><div class="row end"><button class="btn d" id="wGo">مسح</button></div>', { small: true });
   m.querySelector('#wGo').onclick = async () => {
     if (m.querySelector('#wC').value.trim() !== 'امسح') return toast('اكتب «امسح» للتأكيد', 'err');
-    const btn = m.querySelector('#wGo'); btn.disabled = true; btn.textContent = 'عم يمسح…';
+    const btn = m.querySelector('#wGo'); btn.disabled = true; btn.textContent = 'جارٍ المسح…';
     const sets = { txns: true, items: m.querySelector('#wI').checked, suppliers: m.querySelector('#wS').checked, employees: m.querySelector('#wE').checked };
     for (const c of Object.keys(sets)) if (sets[c]) for (const x of A.st[c].slice()) await remove(c, x.id);
     const cfg = clone(A.st.cfg); cfg.startDate = m.querySelector('#wD').value || cfg.startDate; cfg.lockDate = ''; await saveCfg(cfg);
-    audit('مسح بيانات التجربة', n + ' عملية · بدء جديد ' + cfg.startDate + (sets.items ? ' · مع الأصناف' : '') + (sets.suppliers ? ' · مع التجار' : '') + (sets.employees ? ' · مع الموظفين' : ''));
-    A.f = {}; closeModal(m); toast('انمسحت بيانات التجربة', 'ok'); go('home');
+    audit('مسح بيانات التجربة', n + ' قيد · بدء جديد ' + cfg.startDate + (sets.items ? ' · مع الأصناف' : '') + (sets.suppliers ? ' · مع الموردين' : '') + (sets.employees ? ' · مع الموظفين' : ''));
+    A.f = {}; closeModal(m); toast('تم مسح بيانات التجربة', 'ok'); go('home');
   };
 };
 /* ===== التقارير ===== */
@@ -1519,20 +1519,20 @@ const itemCat = (id) => (itemById(id) || {}).cat || '(بدون تصنيف)';
 const isFloor = (locId) => { const l = (A.st.cfg.locations || []).find((x) => x.id === locId); return l && l.kind === 'floor'; };
 
 /* 1) الأرباح */
-rep('pnl', 'الأرباح والخسائر', 'الأرباح', (p) => {
+rep('pnl', 'قائمة الدخل', 'القوائم المالية', (p) => {
   const cfg = A.st.cfg, P = E.pnl(A.L, cfg, p.from, p.to);
   const t1 = [['المبيعات', P.sales], ['(−) تكلفة البضاعة المباعة', -P.cogs], ['(−) فروقات الجرد (عجز)', -P.invDiff], ['مجمل الربح', P.gross], ['هامش مجمل الربح %', P.margin], ['(+) إيرادات أخرى', P.otherInc], ['(−) رواتب الموظفين', -P.salaries]]
     .concat(P.exps.map((x) => ['(−) ' + x.name, -x.amount])).concat([['صافي الربح', P.net]]);
   const months = E.monthsBetween(p.from.slice(0, 7), p.to.slice(0, 7)).slice(0, 24);
   const per = months.map((m) => E.pnl(A.L, cfg, m + '-01' < p.from ? p.from : m + '-01', E.monthEnd(m) > p.to ? p.to : E.monthEnd(m)));
   const expNames = Array.from(new Set(per.flatMap((x) => x.exps.map((e) => e.name))));
-  const rowsM = [['المبيعات', ...per.map((x) => x.sales)], ['تكلفة المبيعات', ...per.map((x) => x.cogs)], ['فروقات الجرد', ...per.map((x) => x.invDiff)], ['مجمل الربح', ...per.map((x) => x.gross)], ['إيرادات أخرى', ...per.map((x) => x.otherInc)], ['الرواتب', ...per.map((x) => x.salaries)]]
+  const rowsM = [['المبيعات', ...per.map((x) => x.sales)], ['تكلفة المبيعات', ...per.map((x) => x.cogs)], ['عجز وزيادة المخزون', ...per.map((x) => x.invDiff)], ['مجمل الربح', ...per.map((x) => x.gross)], ['إيرادات أخرى', ...per.map((x) => x.otherInc)], ['الرواتب', ...per.map((x) => x.salaries)]]
     .concat(expNames.map((n) => [n, ...per.map((x) => (x.exps.find((e) => e.name === n) || {}).amount || 0)])).concat([['صافي الربح', ...per.map((x) => x.net)]]);
   rowsM.forEach((r) => r.push(r3(r.slice(1).reduce((a, b) => a + b, 0))));
   return {
-    kpis: [['المبيعات', P.sales], ['مجمل الربح', P.gross], ['المصاريف + الرواتب', P.expTotal + P.salaries], ['صافي الربح', P.net]],
+    kpis: [['المبيعات', P.sales], ['مجمل الربح', P.gross], ['المصروفات + الرواتب', P.expTotal + P.salaries], ['صافي الربح', P.net]],
     tables: [{ name: 'قائمة الدخل', head: ['البند', 'المبلغ'], rows: t1, bold: [3, t1.length - 1] }, { name: 'حسب الشهر', head: ['البند', ...months.map(fmonth), 'المجموع'], rows: rowsM }],
-    note: 'المصاريف الثابتة الموزّعة بتطلع بحصة كل شهر. الرواتب بعد خصم الغياب والتأخير (خصم السلف ما بيأثر عالربح).',
+    note: 'تظهر المصروفات الثابتة الموزعة بحصة كل شهر. الرواتب بعد خصم الغياب والتأخير (خصم السلف لا يؤثر على الربح).',
   };
 });
 /* 2) المبيعات */
@@ -1544,8 +1544,8 @@ rep('sales', 'المبيعات', 'المبيعات والمشتريات', (p, o)
   const label = (k) => (g === 'day' ? fdate(k) : g === 'month' ? fmonth(k) : g === 'item' ? (itemById(k) || {}).barcode + ' — ' + itemName(k) : g === 'loc' ? locName(k) : g === 'inv' ? k.split('|')[1] + ' · ' + fdate(k.split('|')[0]) : k);
   const tot = ls.reduce((a, l) => { a.q += l.qty; a.n += l.net; a.c += l.cost; return a; }, { q: 0, n: 0, c: 0 });
   return {
-    kpis: [['المبيعات', tot.n], ['القطع', tot.q, 'q'], ['التكلفة', tot.c], ['مجمل الربح', tot.n - tot.c], ['الهامش %', pct(tot.n - tot.c, tot.n), 'p']],
-    tables: [{ name: 'المبيعات', head: [{ day: 'اليوم', month: 'الشهر', year: 'السنة', item: 'الصنف', cat: 'التصنيف', loc: 'الموقع', inv: 'الفاتورة' }[g], 'القطع', 'المبيعات', 'التكلفة', 'مجمل الربح', 'الهامش %'], rows: rows.map((r) => [label(r._k), r.qty, r.net, r.cost, r.profit, pct(r.profit, r.net)]), sum: [1, 2, 3, 4], qty: [1], pctc: [5] }],
+    kpis: [['المبيعات', tot.n], ['القطع', tot.q, 'q'], ['التكلفة', tot.c], ['مجمل الربح', tot.n - tot.c], ['هامش الربح %', pct(tot.n - tot.c, tot.n), 'p']],
+    tables: [{ name: 'المبيعات', head: [{ day: 'اليوم', month: 'الشهر', year: 'السنة', item: 'الصنف', cat: 'التصنيف', loc: 'الموقع', inv: 'الفاتورة' }[g], 'القطع', 'المبيعات', 'التكلفة', 'مجمل الربح', 'هامش الربح %'], rows: rows.map((r) => [label(r._k), r.qty, r.net, r.cost, r.profit, pct(r.profit, r.net)]), sum: [1, 2, 3, 4], qty: [1], pctc: [5] }],
   };
 }, { opts: { g: [['day', 'يومي'], ['month', 'شهري'], ['year', 'سنوي'], ['item', 'حسب الصنف'], ['cat', 'حسب التصنيف'], ['loc', 'حسب الطابق'], ['inv', 'حسب الفاتورة']], loc: 'locs' } });
 /* 3) المشتريات */
@@ -1557,10 +1557,10 @@ rep('purch', 'المشتريات', 'المبيعات والمشتريات', (p, 
   const txOf = (id) => A.st.txns.find((t) => t.id === id) || {};
   const label = (k) => (g === 'inv' ? (txOf(k).type === 'preturn' ? 'مرتجع ' : '') + (txOf(k).ref || '—') + ' · ' + supName(txOf(k).supplierId) + ' · ' + fdate(txOf(k).date) : g === 'sup' ? supName(k) : g === 'item' ? (itemById(k) || {}).barcode + ' — ' + itemName(k) : g === 'month' ? fmonth(k) : k);
   rows.sort((a, b) => (g === 'inv' ? (txOf(a._k).date < txOf(b._k).date ? -1 : 1) : b.value - a.value));
-  const out = { kpis: [['المشتريات (شامل التكاليف الإضافية)', ls.reduce((a, l) => a + l.value, 0)], ['القطع', ls.reduce((a, l) => a + l.qty, 0), 'q']], tables: [{ name: 'المشتريات', head: [{ inv: 'الفاتورة', sup: 'التاجر', item: 'الصنف', month: 'الشهر', cat: 'التصنيف' }[g], 'القطع', 'القيمة'], rows: rows.map((r) => { const x = [label(r._k), r.qty, r.value]; if (g === 'inv') x._id = r._k; return x; }), sum: [1, 2], qty: [1] }] };
+  const out = { kpis: [['المشتريات (شامل التكاليف الإضافية)', ls.reduce((a, l) => a + l.value, 0)], ['القطع', ls.reduce((a, l) => a + l.qty, 0), 'q']], tables: [{ name: 'المشتريات', head: [{ inv: 'الفاتورة', sup: 'المورد', item: 'الصنف', month: 'الشهر', cat: 'التصنيف' }[g], 'القطع', 'القيمة'], rows: rows.map((r) => { const x = [label(r._k), r.qty, r.value]; if (g === 'inv') x._id = r._k; return x; }), sum: [1, 2], qty: [1] }] };
   if (g === 'item') out.tables[0] = { name: 'المشتريات', head: ['الصنف', 'القطع', 'القيمة', 'متوسط تكلفة الشراء'], rows: rows.map((r) => [label(r._k), r.qty, r.value, r.qty ? r3(r.value / r.qty) : 0]), sum: [1, 2], qty: [1] };
   return out;
-}, { opts: { g: [['inv', 'حسب الفاتورة'], ['sup', 'حسب التاجر'], ['item', 'حسب الصنف'], ['cat', 'حسب التصنيف'], ['month', 'شهري']], sup: 'sups' } });
+}, { opts: { g: [['inv', 'حسب الفاتورة'], ['sup', 'حسب المورد'], ['item', 'حسب الصنف'], ['cat', 'حسب التصنيف'], ['month', 'شهري']], sup: 'sups' } });
 /* 4) المخزون حسب الموقع */
 rep('stock', 'المخزون حسب الموقع', 'المخزون', (p, o) => {
   const L = E.build(A.st, p.to); const ls = locs();
@@ -1596,17 +1596,17 @@ rep('move', 'حركة الأصناف (الأقل والأكثر مبيعاً)', 
   return { tables: [{ name: 'حركة الأصناف', head: ['الباركود', 'الصنف', 'التصنيف', 'أول الفترة', 'مشترى', 'مباع', 'فروقات جرد', 'آخر الفترة', 'نسبة البيع %'], rows, sum: [3, 4, 5, 6, 7], qty: [3, 4, 5, 6, 7], pctc: [8] }], note: 'نسبة البيع = المباع ÷ (أول الفترة + المشترى).' };
 }, { opts: { cat: 'cats', dir: [['asc', 'الأقل مبيعاً أولاً'], ['desc', 'الأكثر مبيعاً أولاً']] } });
 /* 7) النقل */
-rep('transfers', 'نقل البضاعة', 'المخزون', (p) => {
+rep('transfers', 'التحويلات المخزنية', 'المخزون', (p) => {
   const rows = []; E.sortTx(A.st.txns.filter((t) => t.status === 'posted' && t.type === 'transfer' && inP(t.date, p))).forEach((t) => t.lines.forEach((l) => { const r = [t.date, locName(t.from), locName(t.to), (itemById(l.itemId) || {}).barcode, itemName(l.itemId), num(l.qty)]; r._id = t.id; rows.push(r); }));
   return { tables: [{ name: 'النقل', head: ['التاريخ', 'من', 'إلى', 'الباركود', 'الصنف', 'الكمية'], rows, sum: [5], qty: [5], dates: [0] }] };
 });
 /* 8) فروقات الجرد */
-rep('counts', 'فروقات الجرد', 'المخزون', (p) => {
+rep('counts', 'عجز وزيادة المخزون', 'المخزون', (p) => {
   const rows = []; A.L.posted.filter((t) => t.type === 'count' && inP(t.date, p)).forEach((t) => (A.L.countCalc[t.id] || []).forEach((c) => { if (!c.diff) return; const r = [t.date, locName(t.locId), (itemById(c.itemId) || {}).barcode, itemName(c.itemId), c.sys, c.counted, c.diff, c.value]; r._id = t.id; rows.push(r); }));
-  return { tables: [{ name: 'فروقات الجرد', head: ['التاريخ', 'الموقع', 'الباركود', 'الصنف', 'النظام', 'المعدود', 'الفرق', 'القيمة'], rows, sum: [6, 7], qty: [4, 5, 6], dates: [0] }], note: 'القيمة السالبة = عجز (خسارة)، والموجبة = زيادة.' };
+  return { tables: [{ name: 'عجز وزيادة المخزون', head: ['التاريخ', 'الموقع', 'الباركود', 'الصنف', 'النظام', 'المعدود', 'الفرق', 'القيمة'], rows, sum: [6, 7], qty: [4, 5, 6], dates: [0] }], note: 'القيمة السالبة = عجز (خسارة)، والموجبة = زيادة.' };
 });
-/* 9) المصاريف */
-rep('exp', 'المصاريف', 'المصاريف والرواتب', (p, o) => {
+/* 9) المصروفات */
+rep('exp', 'المصروفات', 'المصروفات والرواتب', (p, o) => {
   const g = o.g || 'cat', basis = o.basis || 'acc';
   let list;
   if (basis === 'acc') list = E.lines(A.L, p.from, p.to).filter((l) => String(l.acc).startsWith('6:')).map((l) => ({ date: l.date, cat: E.accName(l.acc, A.st.cfg), amount: r3(l.dr - l.cr) }));
@@ -1614,65 +1614,65 @@ rep('exp', 'المصاريف', 'المصاريف والرواتب', (p, o) => {
     list = [];
     A.L.posted.forEach((t) => { if (!inP(t.date, p)) return; if (t.type === 'expense' && t.pay !== 'unpaid') list.push({ date: t.date, cat: catName(t.catId), amount: num(t.amount) }); if (t.type === 'billpay') { const ex = A.st.txns.find((x) => x.id === t.expenseId) || {}; list.push({ date: t.date, cat: catName(ex.catId), amount: num(t.amount) }); } });
   }
-  if (o.sal) { A.L.posted.filter((t) => t.type === 'payroll' && (basis === 'acc' ? true : true) && inP(t.date, p)).forEach((t) => list.push({ date: t.date, cat: 'رواتب الموظفين', amount: basis === 'acc' ? E.payrollCalc(t).gross : E.payrollCalc(t).net })); }
+  if (o.sal) { A.L.posted.filter((t) => t.type === 'payroll' && (basis === 'acc' ? true : true) && inP(t.date, p)).forEach((t) => list.push({ date: t.date, cat: 'الرواتب والأجور', amount: basis === 'acc' ? E.payrollCalc(t).gross : E.payrollCalc(t).net })); }
   const key = { cat: (x) => x.cat, day: (x) => x.date, month: (x) => x.date.slice(0, 7), year: (x) => x.date.slice(0, 4) }[g];
   const rows = groupSum(list, key, ['amount']).sort((a, b) => (g === 'cat' ? b.amount - a.amount : a._k < b._k ? -1 : 1));
   const tot = list.reduce((a, x) => a + x.amount, 0);
   const t2 = g !== 'cat' ? [] : [];
-  return { kpis: [['المجموع', tot]], tables: [{ name: 'المصاريف', head: [{ cat: 'البند', day: 'اليوم', month: 'الشهر', year: 'السنة' }[g], 'المبلغ', 'النسبة %'], rows: rows.map((r) => [g === 'day' ? fdate(r._k) : g === 'month' ? fmonth(r._k) : r._k, r.amount, pct(r.amount, tot)]), sum: [1], pctc: [2] }].concat(t2), note: basis === 'acc' ? 'حسب الاستحقاق: المصاريف الثابتة بحصة كل شهر، والفواتير بتاريخها حتى لو مش مدفوعة.' : 'حسب الدفع: المبالغ اللي طلعت فعلاً من الكاش أو البنك بتاريخها.' };
-}, { opts: { g: [['cat', 'حسب البند'], ['day', 'يومي'], ['month', 'شهري'], ['year', 'سنوي']], basis: [['acc', 'حسب الاستحقاق'], ['cash', 'حسب الدفع']], sal: [['', 'بدون الرواتب'], ['1', 'مع الرواتب']] } });
+  return { kpis: [['المجموع', tot]], tables: [{ name: 'المصروفات', head: [{ cat: 'البند', day: 'اليوم', month: 'الشهر', year: 'السنة' }[g], 'المبلغ', 'النسبة %'], rows: rows.map((r) => [g === 'day' ? fdate(r._k) : g === 'month' ? fmonth(r._k) : r._k, r.amount, pct(r.amount, tot)]), sum: [1], pctc: [2] }].concat(t2), note: basis === 'acc' ? 'أساس الاستحقاق: المصروفات الثابتة بحصة كل شهر، والفواتير بتاريخها ولو لم تُسدَّد.' : 'الأساس النقدي: المبالغ المدفوعة فعلياً من الصندوق أو البنك بتاريخ الدفع.' };
+}, { opts: { g: [['cat', 'حسب البند'], ['day', 'يومي'], ['month', 'شهري'], ['year', 'سنوي']], basis: [['acc', 'أساس الاستحقاق'], ['cash', 'الأساس النقدي']], sal: [['', 'بدون الرواتب'], ['1', 'مع الرواتب']] } });
 /* 10) الفواتير */
-rep('bills', 'فواتير المصاريف', 'المصاريف والرواتب', (p, o) => {
+rep('bills', 'المصروفات المستحقة والفواتير', 'المصروفات والرواتب', (p, o) => {
   const paid = {}; A.L.posted.filter((t) => t.type === 'billpay').forEach((t) => (paid[t.expenseId] = r3((paid[t.expenseId] || 0) + num(t.amount))));
-  const rows = E.sortTx(A.L.posted.filter((t) => t.type === 'expense' && inP(t.date, p) && (!o.cat || t.catId === o.cat))).map((t) => { const pd = t.pay === 'unpaid' ? paid[t.id] || 0 : num(t.amount); const r = [t.date, catName(t.catId), t.ref || '', t.billFrom ? fdate(t.billFrom) + ' — ' + fdate(t.billTo) : '', t.desc || '', num(t.amount), pd, r3(num(t.amount) - pd), r3(num(t.amount) - pd) > 0 ? 'غير مدفوعة' : 'مدفوعة']; r._id = t.id; return r; });
+  const rows = E.sortTx(A.L.posted.filter((t) => t.type === 'expense' && inP(t.date, p) && (!o.cat || t.catId === o.cat))).map((t) => { const pd = t.pay === 'unpaid' ? paid[t.id] || 0 : num(t.amount); const r = [t.date, catName(t.catId), t.ref || '', t.billFrom ? fdate(t.billFrom) + ' — ' + fdate(t.billTo) : '', t.desc || '', num(t.amount), pd, r3(num(t.amount) - pd), r3(num(t.amount) - pd) > 0 ? 'مستحق (غير مسدد)' : 'مدفوعة']; r._id = t.id; return r; });
   return { tables: [{ name: 'الفواتير', head: ['التاريخ', 'البند', 'رقم الفاتورة', 'الفترة', 'البيان', 'المبلغ', 'المدفوع', 'الباقي', 'الحالة'], rows, sum: [5, 6, 7], dates: [0] }] };
 }, { opts: { cat: 'expcats' } });
 /* 11) الرواتب */
-rep('payroll', 'الرواتب', 'المصاريف والرواتب', (p) => {
+rep('payroll', 'الرواتب', 'المصروفات والرواتب', (p) => {
   const ps = E.sortTx(A.L.posted.filter((t) => t.type === 'payroll' && t.month >= p.from.slice(0, 7) && t.month <= p.to.slice(0, 7)));
   const rows = ps.map((t) => { const c = E.payrollCalc(t); const r = [fmonth(t.month), empName(t.empId), num(t.base), num(t.absDays), num(t.absDed), num(t.lateDed), num(t.otherDed), num(t.bonus), c.gross, num(t.advDed), c.net]; r._id = t.id; return r; });
   const byEmp = groupSum(ps.map((t) => Object.assign({ e: t.empId, gross: E.payrollCalc(t).gross, net: E.payrollCalc(t).net, adv: num(t.advDed) })), (x) => x.e, ['gross', 'adv', 'net']);
   return { tables: [{ name: 'تفصيل الرواتب', head: ['الشهر', 'الموظف', 'الأساسي', 'أيام غياب', 'خصم غياب', 'خصم تأخير', 'خصومات أخرى', 'مكافأة', 'الراتب المستحق', 'خصم سلف', 'الصافي المدفوع'], rows, sum: [2, 3, 4, 5, 6, 7, 8, 9, 10], qty: [3] }, { name: 'حسب الموظف', head: ['الموظف', 'الرواتب المستحقة', 'خصم سلف', 'المدفوع'], rows: byEmp.map((x) => [empName(x._k), x.gross, x.adv, x.net]), sum: [1, 2, 3] }], note: 'الفترة حسب شهر الراتب.' };
 });
 /* 12) السلف */
-rep('adv', 'السلف', 'المصاريف والرواتب', (p, o) => {
+rep('adv', 'السلف', 'المصروفات والرواتب', (p, o) => {
   const advs = E.advances(A.st).filter((a) => !a.over && (!o.emp || a.empId === o.emp));
   const byEmp = groupSum(advs, (a) => a.empId, ['amount', 'paid', 'remaining']);
   const rows = advs.map((a) => { const r = [a.date, empName(a.empId), a.amount, a.mode === 'inst' ? a.count + ' أقساط × ' + fmt(a.inst) : 'كاملة من الراتب', fmonth(a.start), a.paid, a.remaining, a.hist.map((h) => fmonth(h.month) + ': ' + fmt(h.amount)).join(' · ')]; r._id = a.id; return r; });
-  return { tables: [{ name: 'حسب الموظف', head: ['الموظف', 'مجموع السلف', 'المخصوم / المسدد', 'الباقي'], rows: byEmp.map((x) => [empName(x._k), x.amount, x.paid, x.remaining]), sum: [1, 2, 3] }, { name: 'تفصيل السلف', head: ['التاريخ', 'الموظف', 'المبلغ', 'طريقة الخصم', 'أول شهر', 'المخصوم', 'الباقي', 'الخصومات'], rows, sum: [2, 5, 6], dates: [0] }], note: 'كل السلف لحد اليوم (الفترة ما بتأثر).' };
+  return { tables: [{ name: 'حسب الموظف', head: ['الموظف', 'مجموع السلف', 'المخصوم / المسدد', 'الباقي'], rows: byEmp.map((x) => [empName(x._k), x.amount, x.paid, x.remaining]), sum: [1, 2, 3] }, { name: 'تفصيل السلف', head: ['التاريخ', 'الموظف', 'المبلغ', 'طريقة الخصم', 'أول شهر', 'المخصوم', 'الباقي', 'الخصومات'], rows, sum: [2, 5, 6], dates: [0] }], note: 'جميع السلف حتى اليوم (الفترة لا تؤثر).' };
 }, { opts: { emp: 'emps' } });
-/* 13) التجار */
-rep('sup', 'أرصدة التجار', 'المبيعات والمشتريات', (p) => {
+/* 13) الموردون */
+rep('sup', 'أرصدة الموردين', 'المبيعات والمشتريات', (p) => {
   const bal = E.partyBalances(A.L, E.ACC.ap, p.to);
   const inp2 = {}, pay = {}; E.lines(A.L, p.from, p.to).filter((l) => l.acc === E.ACC.ap).forEach((l) => { inp2[l.party] = r3((inp2[l.party] || 0) + l.cr); pay[l.party] = r3((pay[l.party] || 0) + l.dr); });
   const pur = {}; A.L.purchLines.filter((l) => inP(l.date, p)).forEach((l) => (pur[l.supplierId] = r3((pur[l.supplierId] || 0) + l.value)));
   const rows = A.st.suppliers.map((s) => { const r = [s.name, pur[s.id] || 0, inp2[s.id] || 0, pay[s.id] || 0, -(bal[s.id] || 0)]; r._act = ['supCard', s.id]; return r; }).filter((r) => r[1] || r[2] || r[3] || r[4]);
-  return { tables: [{ name: 'التجار', head: ['التاجر', 'المشتريات بالفترة', 'ديون جديدة بالفترة', 'دفعات/مرتجعات بالفترة', 'الرصيد المستحق له (بتاريخ إلى)'], rows, sum: [1, 2, 3, 4] }] };
+  return { tables: [{ name: 'الموردون', head: ['المورد', 'المشتريات بالفترة', 'مشتريات آجلة بالفترة', 'مدفوعات ومردودات بالفترة', 'الرصيد الدائن (بتاريخ إلى)'], rows, sum: [1, 2, 3, 4] }] };
 });
 /* 14) الصندوق والبنك */
-rep('cash', 'الصندوق والبنك', 'الفلوس', (p, o) => {
+rep('cash', 'دفتر النقدية (الصندوق والبنك)', 'النقدية والضريبة', (p, o) => {
   const acc = o.acc === 'bank' ? E.ACC.bank : E.ACC.cash;
   const cb = E.cashBook(A.L, acc, p.from, p.to);
   const daily = groupSum(cb.rows.map((r) => ({ d: r.date, in: r.dr, out: r.cr })), (x) => x.d, ['in', 'out']); let b = cb.opening;
   const drow = daily.map((x) => { b = r3(b + x.in - x.out); return [x._k, x.in, x.out, b]; });
   const rows = cb.rows.map((r) => { const x = [r.date, E.TYPES[r.type], r.ref || '', r.memo || r.desc || '', r.dr, r.cr, r.bal]; x._id = r.id; return x; });
-  return { kpis: [['رصيد أول الفترة', cb.opening], ['داخل', cb.in], ['طالع', cb.out], ['رصيد آخر الفترة', cb.closing]], tables: [{ name: 'يومي', head: ['اليوم', 'داخل', 'طالع', 'الرصيد'], rows: drow, sum: [1, 2], dates: [0] }, { name: 'الحركات', head: ['التاريخ', 'العملية', 'المرجع', 'البيان', 'داخل', 'طالع', 'الرصيد'], rows, sum: [4, 5], dates: [0] }] };
-}, { opts: { acc: [['cash', 'الكاش'], ['bank', 'البنك / الفيزا']] } });
+  return { kpis: [['رصيد أول الفترة', cb.opening], ['المقبوضات', cb.in], ['المدفوعات', cb.out], ['رصيد آخر الفترة', cb.closing]], tables: [{ name: 'يومي', head: ['اليوم', 'المقبوضات', 'المدفوعات', 'الرصيد'], rows: drow, sum: [1, 2], dates: [0] }, { name: 'الحركات', head: ['التاريخ', 'المستند', 'المرجع', 'البيان', 'المقبوضات', 'المدفوعات', 'الرصيد'], rows, sum: [4, 5], dates: [0] }] };
+}, { opts: { acc: [['cash', 'الصندوق (النقدية)'], ['bank', 'البنك']] } });
 /* 15) الضريبة */
-rep('tax', 'الضريبة (تقديري)', 'الفلوس', (p) => {
+rep('tax', 'ضريبة المبيعات (تقديرية)', 'النقدية والضريبة', (p) => {
   const t = E.tax(A.L, A.st, p.from, p.to);
-  return { kpis: [['ضريبة المبيعات', t.sTax], ['ضريبة المشتريات', t.pTax], ['الفرق', t.net]], tables: [{ name: 'الضريبة', head: ['البند', 'المبلغ الكامل', 'قبل الضريبة', 'الضريبة ' + t.rate + '%'], rows: [['المبيعات', t.sales, t.salesNet, t.sTax], ['المشتريات (بضاعة)', t.purch, t.purchNet, t.pTax], ['الفرق (مبيعات − مشتريات)', r3(t.sales - t.purch), r3(t.salesNet - t.purchNet), t.net]] }], note: 'حساب للمعلومة بس: المبالغ مسجلة كاملة، والضريبة = المبلغ × ' + t.rate + ' ÷ ' + (100 + t.rate) + '. ما بيعمل قيود ضريبة، وما بيغني عن الإقرار الرسمي.' };
+  return { kpis: [['ضريبة المبيعات', t.sTax], ['ضريبة المشتريات', t.pTax], ['الفرق', t.net]], tables: [{ name: 'الضريبة', head: ['البند', 'المبلغ الكامل', 'قبل الضريبة', 'الضريبة ' + t.rate + '%'], rows: [['المبيعات', t.sales, t.salesNet, t.sTax], ['المشتريات (بضاعة)', t.purch, t.purchNet, t.pTax], ['الفرق (مبيعات − مشتريات)', r3(t.sales - t.purch), r3(t.salesNet - t.purchNet), t.net]] }], note: 'حساب للمعلومة بس: المبالغ مسجلة كاملة، والضريبة = المبلغ × ' + t.rate + ' ÷ ' + (100 + t.rate) + '. لا يُنشئ قيود ضريبة ولا يغني عن الإقرار الضريبي الرسمي.' };
 });
 /* 16) ميزان المراجعة والمركز المالي */
-rep('tb', 'ميزان المراجعة والمركز المالي', 'الفلوس', (p) => {
+rep('tb', 'ميزان المراجعة والمركز المالي', 'القوائم المالية', (p) => {
   const cfg = A.st.cfg, tb = E.trialBalance(A.L, cfg, p.to), b = E.balances(A.L, null, p.to);
   const sum = (t) => r3(Object.keys(b).filter((k) => E.ACC_TYPE(k) === t).reduce((a, k) => a + b[k], 0));
   const assets = sum('asset'), liab = -sum('liability'), eq = -sum('equity'), profit = -(sum('revenue') + sum('cogs') + sum('expense'));
   const bs = Object.keys(b).filter((k) => Math.abs(b[k]) > 0.0005 && ['asset', 'liability', 'equity'].includes(E.ACC_TYPE(k))).sort().map((k) => [E.ACC_TYPE(k) === 'asset' ? 'أصول' : E.ACC_TYPE(k) === 'liability' ? 'التزامات' : 'حقوق الملكية', E.accName(k, cfg), E.ACC_TYPE(k) === 'asset' ? b[k] : -b[k]]);
   bs.push(['حقوق الملكية', 'أرباح متراكمة (من بداية النظام)', profit]);
-  return { kpis: [['مجموع الأصول', assets], ['الالتزامات', liab], ['حقوق الملكية + الأرباح', eq + profit], ['الفرق', r3(assets - liab - eq - profit)]], tables: [{ name: 'المركز المالي', head: ['القسم', 'الحساب', 'الرصيد'], rows: bs }, { name: 'ميزان المراجعة', head: ['الرمز', 'الحساب', 'مدين', 'دائن'], rows: tb.rows.map((r) => [r.acc, r.name, r.dr, r.cr]), sum: [2, 3] }], note: 'بتاريخ «إلى». لازم يكون الفرق صفر ومجموع المدين = الدائن.' };
+  return { kpis: [['مجموع الأصول', assets], ['الالتزامات', liab], ['حقوق الملكية + الأرباح', eq + profit], ['الفرق', r3(assets - liab - eq - profit)]], tables: [{ name: 'المركز المالي', head: ['القسم', 'الحساب', 'الرصيد'], rows: bs }, { name: 'ميزان المراجعة', head: ['الرمز', 'الحساب', 'مدين', 'دائن'], rows: tb.rows.map((r) => [r.acc, r.name, r.dr, r.cr]), sum: [2, 3] }], note: 'بتاريخ «إلى». يجب أن يكون الفرق صفراً ومجموع المدين = الدائن.' };
 }, { asOf: true });
-rep('warnings', 'التحذيرات', 'الفلوس', () => ({ tables: [{ name: 'التحذيرات', head: ['التاريخ', 'التحذير'], rows: A.L.warnings.map((w) => { const r = [w.date, w.msg]; r._id = w.id; return r; }), dates: [0] }] }), { noPeriod: true });
+rep('warnings', 'التحذيرات', 'النقدية والضريبة', () => ({ tables: [{ name: 'التحذيرات', head: ['التاريخ', 'التحذير'], rows: A.L.warnings.map((w) => { const r = [w.date, w.msg]; r._id = w.id; return r; }), dates: [0] }] }), { noPeriod: true });
 
 /* ---- صفحة التقارير ---- */
 A.actions.openRep = (id) => { A.f.rep = id; if (A.route !== 'reports') go('reports'); else render(); };
@@ -1685,7 +1685,7 @@ PAGES.reports = (v) => {
     return;
   }
   const o = (A.f['ro_' + id] = A.f['ro_' + id] || {});
-  const srcOpts = { locs: () => [['', 'كل المواقع']].concat(locs().map((l) => [l.id, l.name])), sups: () => [['', 'كل التجار']].concat(A.st.suppliers.map((s) => [s.id, s.name])), cats: () => [['', 'كل التصنيفات']].concat(Array.from(new Set(A.st.items.map((i) => i.cat).filter(Boolean))).sort().map((c) => [c, c])), expcats: () => [['', 'كل البنود']].concat(cats(true).map((c) => [c.id, c.name])), emps: () => [['', 'كل الموظفين']].concat(A.st.employees.map((e) => [e.id, e.name])) };
+  const srcOpts = { locs: () => [['', 'كل المواقع']].concat(locs().map((l) => [l.id, l.name])), sups: () => [['', 'كل الموردين']].concat(A.st.suppliers.map((s) => [s.id, s.name])), cats: () => [['', 'كل التصنيفات']].concat(Array.from(new Set(A.st.items.map((i) => i.cat).filter(Boolean))).sort().map((c) => [c, c])), expcats: () => [['', 'كل البنود']].concat(cats(true).map((c) => [c.id, c.name])), emps: () => [['', 'كل الموظفين']].concat(A.st.employees.map((e) => [e.id, e.name])) };
   let h = '<div class="row" style="margin-bottom:10px"><button class="btn" data-act="openRep" data-arg="">→ كل التقارير</button><b style="font-size:17px">' + r.name + '</b><span style="flex:1"></span><button class="btn b" id="repX">تصدير Excel</button></div>';
   if (!r.noPeriod) h += periodBar('rp');
   if (r.opts) h += '<div class="row" style="margin-bottom:12px">' + Object.keys(r.opts).map((k) => { const list = typeof r.opts[k] === 'string' ? srcOpts[r.opts[k]]() : r.opts[k]; if (o[k] == null) o[k] = list[0][0]; return '<select data-ro="' + k + '" style="width:auto">' + list.map((x) => opt(x[0], x[1], o[k])).join('') + '</select>'; }).join('') + '</div>';
@@ -1707,7 +1707,7 @@ PAGES.reports = (v) => {
 
 /* ---- تصدير Excel ---- */
 async function exportXlsx(title, tables, kpis) {
-  if (!window.XLSX) return toast('مكتبة Excel ما تحمّلت — تأكد من الإنترنت', 'err');
+  if (!window.XLSX) return toast('تعذّر تحميل مكتبة Excel — تحقق من الاتصال بالإنترنت', 'err');
   const wb = XLSX.utils.book_new(); const used = new Set();
   tables.forEach((t, ti) => {
     const aoa = [[(A.st.cfg.shopName || 'PERFECT') + ' — ' + title], ['تاريخ الطباعة: ' + today()], []];
@@ -1734,7 +1734,7 @@ async function exportXlsx(title, tables, kpis) {
 const normH = (s) => String(s == null ? '' : s).replace(/[\s.]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').toLowerCase();
 function colIdx(H, names) { const h = H.map(normH); for (const n of names) { const i = h.indexOf(normH(n)); if (i >= 0) return i; } for (const n of names) { const i = h.findIndex((x) => x && x.includes(normH(n))); if (i >= 0) return i; } return -1; }
 async function readRows(file, sheetPick) {
-  if (!window.XLSX) throw new Error('مكتبة Excel ما تحمّلت — تأكد من الإنترنت');
+  if (!window.XLSX) throw new Error('تعذّر تحميل مكتبة Excel — تحقق من الاتصال بالإنترنت');
   const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
   const name = (sheetPick && wb.SheetNames.find(sheetPick)) || wb.SheetNames[0];
   return XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: null, raw: true });
@@ -1773,7 +1773,7 @@ A.actions.impItems = async () => {
   const list = rows.slice(hi + 1).filter((r) => r && r[c.bc] != null && String(r[c.bc]).trim()).map((r) => ({ bc: String(r[c.bc]).trim(), name: c.name >= 0 && r[c.name] != null ? String(r[c.name]).trim() : String(r[c.bc]), cat: c.cat >= 0 && r[c.cat] ? String(r[c.cat]).trim() : '', price: c.price >= 0 ? r[c.price] : null, cost: c.cost >= 0 ? r[c.cost] : null }));
   const uniq = new Map(); list.forEach((x) => uniq.set(x.bc, x));
   const L2 = Array.from(uniq.values()); const neu = L2.filter((x) => !itemByBc(x.bc)), upd = L2.filter((x) => itemByBc(x.bc));
-  const m = modal('<h2>استيراد أصناف</h2><dl class="kv"><dt>بالملف</dt><dd>' + L2.length + '</dd><dt>جديدة</dt><dd><b>' + neu.length + '</b></dd><dt>موجودة (بتتحدث الأسماء والأسعار)</dt><dd>' + upd.length + '</dd></dl><div class="fg" style="margin-top:10px">' + fld('طابق البيع الافتراضي للأصناف الجديدة', '<select id="iiLoc"><option value="">—</option>' + locs().filter((l) => l.kind === 'floor').map((l) => opt(l.id, l.name)).join('') + '</select>') + '</div><div class="row end" style="margin-top:12px"><button class="btn p" id="iiGo">استيراد</button></div>', { small: true });
+  const m = modal('<h2>استيراد أصناف</h2><dl class="kv"><dt>بالملف</dt><dd>' + L2.length + '</dd><dt>جديدة</dt><dd><b>' + neu.length + '</b></dd><dt>موجودة (تُحدَّث الأسماء والأسعار)</dt><dd>' + upd.length + '</dd></dl><div class="fg" style="margin-top:10px">' + fld('طابق البيع الافتراضي للأصناف الجديدة', '<select id="iiLoc"><option value="">—</option>' + locs().filter((l) => l.kind === 'floor').map((l) => opt(l.id, l.name)).join('') + '</select>') + '</div><div class="row end" style="margin-top:12px"><button class="btn p" id="iiGo">استيراد</button></div>', { small: true });
   m.querySelector('#iiGo').onclick = async () => {
     const loc = m.querySelector('#iiLoc').value; m.querySelector('#iiGo').disabled = true;
     await ensureItems(neu.map((x) => Object.assign({}, x, { loc })));
@@ -1789,7 +1789,7 @@ A.actions.impSales = async () => {
   const hi = headerRow(rows, ['الباركود', 'الكمية']); if (hi < 0) return toast('ما لقيت أعمدة الباركود والكمية', 'err');
   const H = rows[hi];
   const c = { inv: colIdx(H, ['رقم الفاتورة']), date: colIdx(H, ['تاريخ الفاتورة', 'التاريخ']), bc: colIdx(H, ['الباركود']), name: colIdx(H, ['اسم الصنف', 'الصنف']), price: colIdx(H, ['السعر']), qty: colIdx(H, ['الكمية']), disc: colIdx(H, ['الخصم']), net: colIdx(H, ['الصافي مع ضريبة']) };
-  if ([c.inv, c.date, c.bc, c.price, c.qty].some((i) => i < 0)) return toast('لازم أعمدة: رقم الفاتورة، تاريخ الفاتورة، الباركود، السعر، الكمية', 'err', 6000);
+  if ([c.inv, c.date, c.bc, c.price, c.qty].some((i) => i < 0)) return toast('يجب أعمدة: رقم الفاتورة، تاريخ الفاتورة، الباركود، السعر، الكمية', 'err', 6000);
   const lines = rows.slice(hi + 1).filter((r) => r && r[c.inv] != null && r[c.bc] != null && num(r[c.qty])).map((r) => ({ inv: String(r[c.inv]).trim(), date: parseDate(r[c.date]), bc: String(r[c.bc]).trim(), name: c.name >= 0 ? r[c.name] : '', price: num(r[c.price]), qty: num(r[c.qty]), disc: c.disc >= 0 ? num(r[c.disc]) : 0, net: c.net >= 0 ? num(r[c.net]) : null }));
   const bad = lines.filter((l) => !l.date);
   const seen = new Set(); A.st.txns.filter((t) => t.type === 'sale' && t.status !== 'void').forEach((t) => (t.lines || []).forEach((l) => l.inv && seen.add(String(l.inv))));
@@ -1802,10 +1802,10 @@ A.actions.impSales = async () => {
   const invs = new Set(ok.map((l) => l.inv));
   const total = r3(ok.reduce((s, l) => s + l.qty * l.price - l.disc, 0));
   const m = modal('<h2>استيراد مبيعات</h2><dl class="kv"><dt>الملف</dt><dd>' + esc(f.name) + '</dd><dt>جاهز</dt><dd><b>' + invs.size + ' فاتورة</b> · ' + ok.length + ' سطر · ' + fq(ok.reduce((s, l) => s + l.qty, 0)) + ' قطعة · <b>' + fmt(total) + '</b></dd>' +
-    (days.length ? '<dt>الأيام</dt><dd>' + fdate(days[0]) + ' — ' + fdate(days[days.length - 1]) + ' (' + days.length + ' يوم = ' + days.length + ' عملية بيع)</dd>' : '') +
-    '<dt>مستوردة قبل (بتنتجاهل)</dt><dd>' + new Set(dup.map((l) => l.inv)).size + ' فاتورة</dd><dt>قبل تاريخ البدء/الإقفال</dt><dd>' + early.length + ' سطر</dd>' + (bad.length ? '<dt>بدون تاريخ</dt><dd class="neg">' + bad.length + ' سطر</dd>' : '') +
-    '<dt>أصناف جديدة</dt><dd>' + newBc.length + (newBc.length ? ' <span class="mut">(بتنضاف بدون تكلفة — سجّل فاتورة شرائها أو تكلفتها)</span>' : '') + '</dd>' + (mismatch.length ? '<dt>تنبيه</dt><dd class="neg">' + mismatch.length + ' سطر الصافي فيه مختلف عن السعر×الكمية−الخصم</dd>' : '') + '</dl>' +
-    '<div class="fg" style="margin-top:12px">' + fld('تنخصم البضاعة من', '<select id="isLoc"><option value="item">حسب طابق الصنف</option>' + locs().map((l) => opt(l.id, l.name)).join('') + '</select>', 'الأصناف بدون طابق بتنخصم من أول طابق') + fld('القبض', '<select id="isPay">' + opt('cash', 'كاش') + opt('bank', 'فيزا / بنك') + '</select>', 'بتقدر تعدل كل يوم لحاله بعدين لو في فيزا') + fld('الحالة', '<select id="isSt">' + opt('posted', 'ترحيل مباشر') + opt('draft', 'مسودات للمراجعة') + '</select>') + '</div>' +
+    (days.length ? '<dt>الأيام</dt><dd>' + fdate(days[0]) + ' — ' + fdate(days[days.length - 1]) + ' (' + days.length + ' يوم = ' + days.length + ' فاتورة مبيعات)</dd>' : '') +
+    '<dt>مستوردة قبل (سيتم تجاهلها)</dt><dd>' + new Set(dup.map((l) => l.inv)).size + ' فاتورة</dd><dt>قبل تاريخ البدء/الإقفال</dt><dd>' + early.length + ' سطر</dd>' + (bad.length ? '<dt>بدون تاريخ</dt><dd class="neg">' + bad.length + ' سطر</dd>' : '') +
+    '<dt>أصناف جديدة</dt><dd>' + newBc.length + (newBc.length ? ' <span class="mut">(تُضاف دون تكلفة — يُرجى تسجيل فاتورة شرائها أو تكلفتها)</span>' : '') + '</dd>' + (mismatch.length ? '<dt>تنبيه</dt><dd class="neg">' + mismatch.length + ' سطر الصافي فيه مختلف عن السعر×الكمية−الخصم</dd>' : '') + '</dl>' +
+    '<div class="fg" style="margin-top:12px">' + fld('تنخصم البضاعة من', '<select id="isLoc"><option value="item">حسب طابق الصنف</option>' + locs().map((l) => opt(l.id, l.name)).join('') + '</select>', 'الأصناف دون طابق محدد تُخصم من الطابق الأول') + fld('حساب القبض', '<select id="isPay">' + opt('cash', 'نقداً') + opt('bank', 'بطاقة / بنك') + '</select>', 'يمكن تعديل كل يوم على حدة لاحقاً عند وجود مقبوضات بالبطاقة') + fld('الحالة', '<select id="isSt">' + opt('posted', 'ترحيل مباشر') + opt('draft', 'مسودات للمراجعة') + '</select>') + '</div>' +
     '<div class="row end" style="margin-top:12px"><button class="btn p" id="isGo" ' + (ok.length ? '' : 'disabled') + '>استيراد</button></div>', { small: true });
   m.querySelector('#isGo').onclick = async () => {
     m.querySelector('#isGo').disabled = true;
@@ -1816,10 +1816,10 @@ A.actions.impSales = async () => {
       const ls = ok.filter((l) => l.date === d).map((l) => { const it = itemByBc(l.bc); const loc = lm === 'item' ? (it.loc && locs().some((x) => x.id === it.loc) ? it.loc : firstFloor) : lm; return { itemId: it.id, locId: loc, qty: l.qty, price: l.price, disc: l.disc, inv: l.inv }; });
       const t = newTx('sale', { date: d, lines: ls, desc: 'مستورد: ' + f.name, ref: '' }); const tot = E.total(t);
       t.cash = pay === 'cash' ? tot : 0; t.bank = pay === 'bank' ? tot : 0;
-      if (status === 'posted') { const er = E.validate(t, A.st); if (er.length) { toast(fdate(d) + ': ' + er[0] + ' — انحفظ كمسودة', 'err', 6000); } else { t.status = 'posted'; t.postedAt = nowIso(); } }
+      if (status === 'posted') { const er = E.validate(t, A.st); if (er.length) { toast(fdate(d) + ': ' + er[0] + ' — حُفظ كمسودة', 'err', 6000); } else { t.status = 'posted'; t.postedAt = nowIso(); } }
       await put('txns', t);
     }
-    audit('استيراد مبيعات', f.name + ' · ' + invs.size + ' فاتورة · ' + fmt(total) + ' · ' + days.length + ' يوم'); closeModal(m); toast('انستوردت ' + invs.size + ' فاتورة', 'ok', 5000);
+    audit('استيراد مبيعات', f.name + ' · ' + invs.size + ' فاتورة · ' + fmt(total) + ' · ' + days.length + ' يوم'); closeModal(m); toast('تم استيراد ' + invs.size + ' فاتورة', 'ok', 5000);
   };
 };
 
@@ -1830,24 +1830,24 @@ A.actions.impPurch = async () => {
   const hi = headerRow(rows, ['الباركود', 'الكمية']); if (hi < 0) return toast('ما لقيت أعمدة الباركود والكمية', 'err');
   const H = rows[hi];
   const c = { bc: colIdx(H, ['الباركود']), name: colIdx(H, ['الصنف', 'اسم الصنف']), qty: colIdx(H, ['الكمية']), cost: colIdx(H, ['الإفرادي ب.ض', 'الافرادي بض', 'تكلفة الوحدة', 'التكلفة']), price: colIdx(H, ['سعر البيع']) };
-  if (c.cost < 0) return toast('لازم عمود «الإفرادي ب.ض» (تكلفة القطعة بعد الضريبة)', 'err', 6000);
+  if (c.cost < 0) return toast('يجب عمود «الإفرادي ب.ض» (تكلفة القطعة بعد الضريبة)', 'err', 6000);
   const src = rows.slice(hi + 1).filter((r) => r && r[c.bc] != null && num(r[c.qty]));
   const neu = src.filter((r) => !itemByBc(r[c.bc]));
   if (neu.length) await ensureItems(neu.map((r) => ({ bc: r[c.bc], name: c.name >= 0 ? r[c.name] : '', price: c.price >= 0 ? r[c.price] : 0, cost: r[c.cost] })));
   const lines = src.map((r) => { const it = itemByBc(r[c.bc]); return { itemId: it.id, qty: num(r[c.qty]), cost: r3(r[c.cost]), sp: c.price >= 0 && r[c.price] != null ? num(r[c.price]) : '' }; });
-  if (!lines.length) return toast('ما في سطور بالملف', 'err');
+  if (!lines.length) return toast('لا يوجد سطور بالملف', 'err');
   const num0 = (f.name.match(/\d+/) || [''])[0];
   openTx(newTx('purchase', { lines, ref: num0, desc: 'من ملف ' + f.name }));
-  toast(lines.length + ' سطر' + (neu.length ? ' · ' + neu.length + ' صنف جديد' : '') + ' — اختار التاجر وتأكد من رقم الفاتورة والتاريخ والدفع', '', 7000);
+  toast(lines.length + ' سطر' + (neu.length ? ' · ' + neu.length + ' صنف جديد' : '') + ' — اختر المورد وتأكد من رقم الفاتورة والتاريخ والدفع', '', 7000);
 };
 
-/* جرد / مخزون افتتاحي من Excel */
+/* جرد / مخزون أول المدة من Excel */
 async function readCountFile() {
   const f = await pickFile(); if (!f) return null;
   let rows; try { rows = await readRows(f); } catch (e) { toast(e.message, 'err'); return null; }
   const hi = headerRow(rows, ['باركود']); if (hi < 0) { toast('ما لقيت عمود الباركود', 'err'); return null; }
   const H = rows[hi]; const c = { bc: colIdx(H, ['الباركود', 'باركود']), qty: colIdx(H, ['الكمية', 'عدد', 'العدد', 'المعدود']), cost: colIdx(H, ['التكلفة', 'الإفرادي ب.ض']), name: colIdx(H, ['الاسم', 'اسم الصنف', 'الصنف', 'رقم موديل', 'صنف']) };
-  if (c.qty < 0) { toast('لازم عمود الكمية / العدد', 'err'); return null; }
+  if (c.qty < 0) { toast('يجب عمود الكمية / العدد', 'err'); return null; }
   const agg = new Map();
   rows.slice(hi + 1).forEach((r) => { if (!r || r[c.bc] == null || r[c.qty] == null || r[c.qty] === '') return; const bc = String(r[c.bc]).trim(); const x = agg.get(bc) || { bc, qty: 0, cost: c.cost >= 0 ? r[c.cost] : null, name: c.name >= 0 ? r[c.name] : '' }; x.qty = r3(x.qty + num(r[c.qty])); agg.set(bc, x); });
   return { f, list: Array.from(agg.values()) };
@@ -1857,14 +1857,14 @@ A.actions.impCount = async () => {
   const unknown = r.list.filter((x) => !itemByBc(x.bc));
   if (unknown.length) await ensureItems(unknown.map((x) => ({ bc: x.bc, name: x.name })));
   openTx(newTx('count', { lines: r.list.map((x) => ({ itemId: itemByBc(x.bc).id, counted: x.qty })), desc: 'من ملف ' + r.f.name }));
-  toast('اختار الموقع وراجع الفروقات قبل الترحيل. الأصناف اللي مش بالملف ما بتتأثر.' + (unknown.length ? ' (' + unknown.length + ' صنف جديد انضاف)' : ''), '', 8000);
+  toast('اختر الموقع وراجع الفروقات قبل الترحيل. الأصناف غير الواردة في الملف لا تتأثر.' + (unknown.length ? ' (' + unknown.length + ' صنف جديد مُضاف)' : ''), '', 8000);
 };
 A.actions.impOstock = async () => {
   const r = await readCountFile(); if (!r) return;
   const unknown = r.list.filter((x) => !itemByBc(x.bc));
   if (unknown.length) await ensureItems(unknown.map((x) => ({ bc: x.bc, name: x.name, cost: x.cost })));
   openTx(newTx('ostock', { date: A.st.cfg.startDate, lines: r.list.map((x) => { const it = itemByBc(x.bc); return { itemId: it.id, qty: x.qty, cost: x.cost != null ? num(x.cost) : it.cost || '' }; }), desc: 'من ملف ' + r.f.name }));
-  toast('اختار الموقع وتأكد من التكاليف (من ملف الأصناف أو الملف).', '', 7000);
+  toast('اختر الموقع وتأكد من التكاليف (من ملف الأصناف أو الملف).', '', 7000);
 };
 // زر «استيراد سطور» داخل النموذج
 async function importLinesInto(e, d, redraw) {
@@ -1875,7 +1875,7 @@ async function importLinesInto(e, d, redraw) {
   const src = rows.slice(hi + 1).filter((r) => r && r[c.bc] != null && String(r[c.bc]).trim());
   const unknown = src.filter((r) => !itemByBc(r[c.bc]));
   let created = [];
-  // الشراء والجرد والمخزون الافتتاحي: الأصناف الجديدة بتنضاف تلقائياً
+  // الشراء والجرد ومخزون أول المدة: الأصناف الجديدة بتنضاف تلقائياً
   if (unknown.length && ['purchase', 'ostock', 'count', 'preturn'].includes(d.type)) {
     const seen = new Map(); unknown.forEach((r) => seen.set(String(r[c.bc]).trim(), r));
     created = await ensureItems(Array.from(seen.values()).map((r) => ({ bc: r[c.bc], name: c.name >= 0 ? r[c.name] : '', price: c.sp >= 0 ? r[c.sp] : c.price >= 0 ? r[c.price] : 0, cost: c.cost >= 0 ? r[c.cost] : 0 })));
@@ -1891,7 +1891,7 @@ async function importLinesInto(e, d, redraw) {
   });
   if (d.type === 'purchase' && !d.ref) { const m0 = f.name.match(/\d+/); if (m0) { d.ref = m0[0]; const el = document.querySelector('.modal [data-k="ref"]'); if (el && !el.value) el.value = d.ref; } }
   redraw();
-  toast(n + ' سطر' + (created.length ? ' · ' + created.length + ' صنف جديد انضاف' : '') + (miss.length ? ' · باركودات مش معروفة: ' + miss.slice(0, 5).join('، ') + ' — ضيفها من المخزون والأصناف' : ''), miss.length ? 'err' : 'ok', 7000);
+  toast(n + ' سطر' + (created.length ? ' · ' + created.length + ' صنف جديد مُضاف' : '') + (miss.length ? ' · باركودات غير معرّفة: ' + miss.slice(0, 5).join('، ') + ' — أضفها من المخزون والأصناف' : ''), miss.length ? 'err' : 'ok', 7000);
 }
 
 /* ملف تطبيق الدوام: ورقة «ملخص الموظفين» */
@@ -1910,7 +1910,7 @@ async function importAttendance(e, month) {
   });
   A.f.att = { month, map, file: f.name }; A.f.payEdits = null;
   audit('استيراد ملف الدوام', f.name + ' · ' + month + ' · ' + Object.keys(map).length + ' موظف');
-  toast('انقرأ ' + Object.keys(map).length + ' موظف' + (miss.length ? ' · مش معروفين: ' + miss.join('، ') : ''), miss.length ? 'err' : 'ok', 7000);
+  toast('تمت قراءة ' + Object.keys(map).length + ' موظف' + (miss.length ? ' · غير معرّفين: ' + miss.join('، ') : ''), miss.length ? 'err' : 'ok', 7000);
   render();
 }
 boot();
