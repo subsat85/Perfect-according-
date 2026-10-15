@@ -154,12 +154,13 @@ dl.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0}dl.kv dt
   /* ---------- الحسابات ---------- */
   const ACC = {
     cash: '1110', bank: '1120', adv: '1300', inv: '1400', prepaid: '1500',
-    ap: '2100', accrued: '2200', capital: '3100', drawings: '3200', opening: '3300',
+    ap: '2100', accrued: '2200', capital: '3100', drawings: '3200', opening: '3300', foundAdj: '3400',
     sales: '4100', otherInc: '4300', cogs: '5100', invDiff: '5200', salaries: '6000',
   };
   const ACC_NAMES = {
     '1110': 'الصندوق', '1120': 'البنك', '1300': 'ذمم الموظفين (سلف)', '1400': 'المخزون', '1500': 'مصروفات مدفوعة مقدماً',
     '2100': 'الذمم الدائنة (الموردون)', '2200': 'مصروفات مستحقة', '3100': 'رأس المال', '3200': 'مسحوبات المالك', '3300': 'أرصدة افتتاحية',
+    '3400': 'فروقات تأسيس الأرصدة الافتتاحية للمخزون',
     '4100': 'المبيعات', '4300': 'إيرادات أخرى', '5100': 'تكلفة البضاعة المباعة', '5200': 'عجز وزيادة المخزون', '6000': 'الرواتب والأجور',
   };
   const ACC_TYPE = (code) => {
@@ -339,7 +340,10 @@ dl.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0}dl.kv dt
             const v = r3(d * avg(l.itemId)); calc.push({ itemId: l.itemId, sys, counted: num(l.counted), diff: d, value: v });
             if (d) { mv(t, l.itemId, t.locId, d, v, 'count'); val += v; }
           });
-          val = r3(val); dr(ACC.inv, val, '', 'فرق جرد'); cr(ACC.invDiff, val, '', 'فرق جرد'); break;
+          val = r3(val);
+          if (t.founding) { dr(ACC.inv, val, '', 'تسوية تأسيس أرصدة افتتاحية للمخزون'); cr(ACC.foundAdj, val, '', 'تسوية تأسيس أرصدة افتتاحية للمخزون'); }
+          else { dr(ACC.inv, val, '', 'فرق جرد'); cr(ACC.invDiff, val, '', 'فرق جرد'); }
+          break;
         }
         case 'sale': {
           if (num(t.cash)) dr(ACC.cash, t.cash, '', 'المقبوض نقداً');
@@ -832,7 +836,7 @@ function newTx(type, extra) {
     preturn: { lines: [], supplierId: '', locId: wh, pay: 'credit' },
     ostock: { lines: [], locId: wh },
     transfer: { lines: [], from: wh, to: floor },
-    count: { lines: [], locId: floor },
+    count: { lines: [], locId: floor, founding: false },
     expense: { catId: '', amount: '', pay: 'cash', spread: null, billFrom: '', billTo: '' },
     billpay: { expenseId: '', amount: '', pay: 'cash' },
     spay: { supplierId: '', amount: '', pay: 'cash' },
@@ -876,7 +880,13 @@ function openTx(t0) {
       if (d.type === 'purchase') h += fld('تكاليف الشراء الإضافية (شحن، جمارك…)', inp('extras', d.extras, 'number', 'step="0.001"'), 'تُوزَّع على الأصناف حسب قيمتها');
       h += fld('طريقة السداد', sel('pay', payOpts(d.pay, ['credit', 'cash', 'bank']))) + (d.type === 'purchase' ? '<div class="f" id="paidF"><label>المدفوع الآن</label>' + inp('paid', d.paid, 'number', 'step="0.001"') + '<span class="h">يُقيَّد الباقي ذمةً دائنة للمورد</span></div>' : '');
       break;
-    case 'ostock': case 'count': h += fld('الموقع', sel('locId', locOpts(d.locId))) + fld('ملاحظة', inp('desc', d.desc)); break;
+    case 'ostock': h += fld('الموقع', sel('locId', locOpts(d.locId))) + fld('ملاحظة', inp('desc', d.desc)); break;
+    case 'count':
+      h += fld('الموقع', sel('locId', locOpts(d.locId))) + fld('ملاحظة', inp('desc', d.desc)) +
+        '<div class="f"><label class="check"><input type="checkbox" data-k="founding" ' + (d.founding ? 'checked' : '') + '> تسوية تأسيس أرصدة افتتاحية</label><span class="h">' +
+        (d.founding ? 'الفرق يُسجَّل بحقوق الملكية (فروقات تأسيس) ولا يدخل في أرباح أو خسائر هذا الموسم.' : 'الفرق يُسجَّل كعجز/زيادة مخزون ضمن أرباح وخسائر هذا الموسم (جرد تشغيلي عادي).') +
+        '</span></div>';
+      break;
     case 'transfer': h += fld('من', sel('from', locOpts(d.from))) + fld('إلى', sel('to', locOpts(d.to))) + fld('ملاحظة', inp('desc', d.desc)); break;
     case 'expense': {
       const sp = d.spread ? (d.spread.from && d.spread.from.slice(5) === '01' && d.spread.to === d.spread.from.slice(0, 4) + '-12' ? 'year' : 'season') : 'none';
@@ -997,9 +1007,10 @@ function openTx(t0) {
   }
   m.addEventListener('input', (e) => {
     const k = e.target.dataset.k; if (!k) return;
-    d[k] = e.target.value; if (k === 'cash' || k === 'bank') payTouched = true; if (k === 'paid') d._paidTouched = true;
+    d[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value; if (k === 'cash' || k === 'bank') payTouched = true; if (k === 'paid') d._paidTouched = true;
     if (d.type === 'purchase' && !d._paidTouched && d.pay !== 'credit') { d.paid = ''; }
     if (['locId', 'from'].includes(k) && COLS) { drawLines(); return; }
+    if (k === 'founding' && d.type === 'count') { const hint = head.querySelector('.f:last-child .h'); if (hint) hint.textContent = d.founding ? 'الفرق يُسجَّل بحقوق الملكية (فروقات تأسيس) ولا يدخل في أرباح أو خسائر هذا الموسم.' : 'الفرق يُسجَّل كعجز/زيادة مخزون ضمن أرباح وخسائر هذا الموسم (جرد تشغيلي عادي).'; }
     refresh();
   });
   m.addEventListener('change', (e) => {
@@ -1057,7 +1068,8 @@ function txSummary(t) {
     case 'sale': return fq(E.qtyOf(t)) + ' قطعة' + (t.lines && t.lines.some((l) => l.inv) ? ' · ' + new Set(t.lines.map((l) => l.inv)).size + ' فاتورة' : '');
     case 'purchase': case 'preturn': return supName(t.supplierId) + ' · ' + locName(t.locId);
     case 'transfer': return locName(t.from) + ' ← ' + locName(t.to) + ' · ' + fq(E.qtyOf(t)) + ' قطعة';
-    case 'count': case 'ostock': return locName(t.locId) + ' · ' + t.lines.length + ' صنف';
+    case 'count': return locName(t.locId) + ' · ' + t.lines.length + ' صنف' + (t.founding ? ' · تأسيسي' : '');
+    case 'ostock': return locName(t.locId) + ' · ' + t.lines.length + ' صنف';
     case 'expense': return catName(t.catId) + (t.desc ? ' · ' + t.desc : '') + (t.spread ? ' · موزّع ' + t.spread.from + '←' + t.spread.to : '') + (t.pay === 'unpaid' ? ' · غير مدفوعة' : '');
     case 'billpay': { const ex = A.st.txns.find((x) => x.id === t.expenseId); return ex ? catName(ex.catId) + ' ' + (ex.ref || '') : ''; }
     case 'spay': return supName(t.supplierId);
@@ -1074,7 +1086,9 @@ function viewTx(id) {
   const tot = E.total(t);
   let h = '<h2>' + esc(E.TYPES[t.type]) + ' ' + esc(t.ref || '') + '</h2>';
   if (t.status === 'void') h += '<div class="errs">ملغاة · ' + esc(t.voidReason || '') + ' · ' + fdate((t.voidAt || '').slice(0, 10)) + '</div>';
-  h += '<div class="card"><dl class="kv"><dt>التاريخ</dt><dd>' + fdate(t.date) + '</dd><dt>التفاصيل</dt><dd>' + esc(txSummary(t)) + '</dd>' + (t.type !== 'transfer' && t.type !== 'count' ? '<dt>المبلغ</dt><dd><b>' + fmt(tot) + '</b></dd>' : '') +
+  h += '<div class="card"><dl class="kv"><dt>التاريخ</dt><dd>' + fdate(t.date) + '</dd><dt>التفاصيل</dt><dd>' + esc(txSummary(t)) + '</dd>' +
+    (t.type === 'count' ? '<dt>نوع التسوية</dt><dd>' + (t.founding ? 'تأسيسية — الفرق بحقوق الملكية (' + E.ACC_NAMES[E.ACC.foundAdj] + ')' : 'تشغيلية — الفرق بأرباح وخسائر الموسم (' + E.ACC_NAMES[E.ACC.invDiff] + ')') + '</dd>' : '') +
+    (t.type !== 'transfer' && t.type !== 'count' ? '<dt>المبلغ</dt><dd><b>' + fmt(tot) + '</b></dd>' : '') +
     (t.pay ? '<dt>طريقة السداد</dt><dd>' + E.PAY_NAMES[t.pay] + (t.type === 'purchase' && t.pay !== 'credit' ? ' · مدفوع ' + fmt(t.paid) : '') + '</dd>' : '') + (t.type === 'sale' ? '<dt>طريقة السداد</dt><dd>نقداً ' + fmt(t.cash) + ' · بطاقة ' + fmt(t.bank) + '</dd>' : '') +
     (t.type === 'payroll' ? '<dt>تفصيل</dt><dd>أساسي ' + fmt(t.base) + ' − غياب ' + fmt(t.absDed) + ' (' + fq(t.absDays) + ' يوم) − تأخير ' + fmt(t.lateDed) + ' − أخرى ' + fmt(t.otherDed) + ' + مكافأة ' + fmt(t.bonus) + ' − سلف ' + fmt(t.advDed) + '</dd>' : '') +
     (t.billFrom ? '<dt>فترة الفاتورة</dt><dd>' + fdate(t.billFrom) + ' — ' + fdate(t.billTo) + '</dd>' : '') +
@@ -1602,8 +1616,16 @@ rep('transfers', 'التحويلات المخزنية', 'المخزون', (p) =>
 });
 /* 8) فروقات الجرد */
 rep('counts', 'عجز وزيادة المخزون', 'المخزون', (p) => {
-  const rows = []; A.L.posted.filter((t) => t.type === 'count' && inP(t.date, p)).forEach((t) => (A.L.countCalc[t.id] || []).forEach((c) => { if (!c.diff) return; const r = [t.date, locName(t.locId), (itemById(c.itemId) || {}).barcode, itemName(c.itemId), c.sys, c.counted, c.diff, c.value]; r._id = t.id; rows.push(r); }));
-  return { tables: [{ name: 'عجز وزيادة المخزون', head: ['التاريخ', 'الموقع', 'الباركود', 'الصنف', 'النظام', 'المعدود', 'الفرق', 'القيمة'], rows, sum: [6, 7], qty: [4, 5, 6], dates: [0] }], note: 'القيمة السالبة = عجز (خسارة)، والموجبة = زيادة.' };
+  const rowsOp = [], rowsF = [];
+  A.L.posted.filter((t) => t.type === 'count' && inP(t.date, p)).forEach((t) => (A.L.countCalc[t.id] || []).forEach((c) => {
+    if (!c.diff) return; const r = [t.date, locName(t.locId), (itemById(c.itemId) || {}).barcode, itemName(c.itemId), c.sys, c.counted, c.diff, c.value]; r._id = t.id;
+    (t.founding ? rowsF : rowsOp).push(r);
+  }));
+  const head = ['التاريخ', 'الموقع', 'الباركود', 'الصنف', 'النظام', 'المعدود', 'الفرق', 'القيمة'];
+  return { tables: [
+    { name: 'تشغيلية (أرباح وخسائر الموسم)', head, rows: rowsOp, sum: [6, 7], qty: [4, 5, 6], dates: [0] },
+    { name: 'تأسيسية (حقوق الملكية — لا تؤثر على الأرباح)', head, rows: rowsF, sum: [6, 7], qty: [4, 5, 6], dates: [0] },
+  ], note: 'القيمة السالبة = عجز (خسارة)، والموجبة = زيادة. التسويات التأسيسية مفصولة لأنها لا تدخل بقائمة الدخل.' };
 });
 /* 9) المصروفات */
 rep('exp', 'المصروفات', 'المصروفات والرواتب', (p, o) => {
